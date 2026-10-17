@@ -1,4 +1,9 @@
-import { lecture } from './lecture.mjs';
+import { lecture as sampleLecture } from './lecture.mjs';
+import {classroomLecture} from './classroom-lecture.mjs';
+import {imageBounds,annotationActive} from './annotations.mjs';
+const publishedId=new URLSearchParams(location.search).get('published');
+let lecture=sampleLecture;
+if(publishedId){try{const r=await fetch('/api/published/'+encodeURIComponent(publishedId));if(!r.ok)throw Error('Published lecture not found.');const d=await r.json(),source=d.sources.find(s=>s.id===d.presentation.sourceId);let pages=source.import.assets.filter(a=>a.kind==='page');if(!pages.length){const response=await fetch('/api/render-slides',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({originalUrl:source.import.originalUrl})});const data=await response.json();if(!response.ok)throw Error(data.error);pages=data.pages;}lecture=classroomLecture(d,pages);}catch(error){document.querySelector('.library-intro p').textContent=error.message;throw error;}}
 import { LecturePlayer } from './player.mjs';
 import { Discussion } from './discussion.mjs';
 import { Presenter } from './presenter.mjs';
@@ -36,7 +41,7 @@ function sync(){
  current=lecture.slides.findIndex(s=>s.id===(viewedSlide ?? segment.slide));
  const slide=lecture.slides[current];
  if(drawnSlide!==slide.id){
-  $('slide-content').innerHTML=`<div><h2 class="slide-title">${slide.title}</h2><p class="slide-copy">${slide.body}</p>${slide.html}</div>`;
+  if(slide.image){$('slide-content').replaceChildren();const img=document.createElement('img');img.src=slide.image;img.alt='Original slide '+slide.id;img.id='classroom-slide-image';const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.id='classroom-annotations';$('slide-content').append(img,svg);}else $('slide-content').innerHTML=`<div><h2 class="slide-title">${slide.title}</h2><p class="slide-copy">${slide.body}</p>${slide.html}</div>`;
   drawnSlide=slide.id;
   if($('continue-lecture')) $('continue-lecture').onclick=()=>{viewedSlide=null;player.continue();resetClock();sync();};
  }
@@ -45,8 +50,8 @@ function sync(){
  if($('activity')) $('activity').hidden=player.state!=='activity';
  if($('explanation')) $('explanation').hidden=segment.reveal!=='explanation';
  $('chapter').textContent=slide.chapter;
- $('slide-number').textContent=`${String(current+1).padStart(2,'0')} / 03`;
- $('progress').textContent=`${current+1} of 3`;
+ $('slide-number').textContent=`${String(current+1).padStart(2,'0')} / ${String(lecture.slides.length).padStart(2,'0')}`;
+ $('progress').textContent=`${current+1} of ${lecture.slides.length}`;
  $('caption').textContent=player.state==='ready'?'Ready when you are. Start the scripted preview below.':player.state==='activity'?(answerSubmitted?'Answer submitted. Waiting for the class.':'Your turn. Submit your answer in the chat.'):segment.text;
  const statuses={ready:'Ready to start',playing:voiceEnabled?'Presenting':'Presenting · silent',paused:'Paused',activity:'Activity break',discussion:'Class discussion',completed:'Lecture complete'};
  $('status').textContent=statuses[player.state];
@@ -221,7 +226,7 @@ async function requestFeedback(){
  const batch=discussion.select();if(!batch)return;
  const epoch=discussionEpoch;discussionRequest=new AbortController();renderDiscussion();
  try{
-  const response=await fetch('/api/discuss',{method:'POST',headers:{'Content-Type':'application/json'},signal:discussionRequest.signal,body:JSON.stringify({messages:batch.map(({id,text,kind})=>({id,text,kind})),history:discussion.history,checkpointId:player.segment.id})});
+  const response=await fetch('/api/discuss',{method:'POST',headers:{'Content-Type':'application/json'},signal:discussionRequest.signal,body:JSON.stringify({messages:batch.map(({id,text,kind})=>({id,text,kind})),history:discussion.history,checkpointId:player.segment.id,publishedId})});
   const result=await response.json();if(!response.ok)throw new Error(result.error||'Feedback unavailable');
   if(epoch!==discussionEpoch||discussion.state!=='reviewing')return;
   if(discussion.remaining<result.text.split(/\s+/).length/2.5+8){discussion.close('Not enough time to deliver feedback');return;}
@@ -274,3 +279,13 @@ function renderCheckpoints(){
   container.append(marker);
  });
 }
+
+fetch('/api/published').then(r=>r.json()).then(({lectures})=>{for(const lecture of lectures){const row=document.createElement('article');row.className='lecture-row';const body=document.createElement('div'),tag=document.createElement('span'),title=document.createElement('h3'),detail=document.createElement('p'),link=document.createElement('a');tag.className='lecture-tag';tag.textContent='PUBLISHED LECTURE';title.textContent=lecture.title;detail.textContent=lecture.duration+' minutes · Slides, voice and AI annotations';link.className='primary';link.textContent='Open lecture ↗';link.href='/?published='+encodeURIComponent(lecture.id);body.append(tag,title,detail);row.append(body,link);$('published-lectures').append(row);}}).catch(()=>{$('published-lectures').textContent='Published lectures could not be loaded. Refresh to retry.';});
+
+if(publishedId){
+ document.body.classList.add('authored-classroom');document.querySelector('.lecture-heading h1').textContent=lecture.title;document.querySelector('.lecture-heading .eyebrow').textContent='YOUR CLASSROOM';document.querySelector('.lecture-heading p').textContent='Slides, narration and discussion';document.querySelector('.stage-bottom span').textContent=lecture.title;document.querySelector('.prototype').textContent='Student classroom';document.querySelector('.top-nav a').hidden=true;
+ $('open-lecture').click();
+}
+function drawClassroomAnnotations(){
+ const svg=$('classroom-annotations'),img=$('classroom-slide-image');if(svg&&img){svg.replaceChildren();const segment=player.segment;if(player.state==='playing'&&segment.slide===lecture.slides[current]?.id&&presenter.position!==null){const b=imageBounds(img.clientWidth,img.clientHeight,img.naturalWidth||16,img.naturalHeight||9);for(const a of segment.annotations||[]){if(!annotationActive(a,presenter.position))continue;const n=document.createElementNS('http://www.w3.org/2000/svg',a.style==='circle'?'ellipse':a.style==='underline'?'line':'rect'),x=b.x+a.x*b.width,y=b.y+a.y*b.height,w=a.w*b.width,h=a.h*b.height,attrs=a.style==='circle'?{cx:x+w/2,cy:y+h/2,rx:w/2,ry:h/2}:a.style==='underline'?{x1:x,y1:y+h,x2:x+w,y2:y+h}:{x,y,width:w,height:h};for(const[k,v]of Object.entries(attrs))n.setAttribute(k,v);n.setAttribute('stroke','#ffbd17');n.setAttribute('stroke-width','3');n.setAttribute('fill',a.style==='highlight'?'#ffd82d40':'none');svg.append(n);}}}requestAnimationFrame(drawClassroomAnnotations);
+}drawClassroomAnnotations();

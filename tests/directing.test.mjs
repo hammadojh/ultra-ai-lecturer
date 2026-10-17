@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {scriptSegments,validateCues,directorMarkdown} from '../directing.mjs';
+import {scriptMarkdown} from '../scripting.mjs';
+const script={segments:[{title:'Explain',seconds:60,kind:'narration',say:'Seven doubled is fourteen.',show:'The original example',actions:'Pause.',sourceIds:['s']},{title:'Final Q&A',seconds:60,kind:'final_qa',say:'What questions remain?',show:'Summary',actions:'Invite questions.',sourceIds:['s']}]};
+const md=scriptMarkdown(script,{title:'Test',brief:{duration:2},sources:[{id:'s',name:'Deck'}]});
+const segments=scriptSegments(md),cues=segments.map(s=>({segmentId:s.id,slide:1,tone:'calm',energy:'medium',pointTo:'',delivery:'Pause after the sentence.'}));
+test('parses approved script without rewriting narration',()=>{assert.equal(segments.length,2);assert.equal(segments[0].say,script.segments[0].say);assert.equal(segments[1].end,120);assert.match(directorMarkdown(segments,cues),/Seven doubled is fourteen\./);});
+test('rejects malformed scripts and non-contiguous timing',()=>{assert.throws(()=>scriptSegments('plain text'),/headings/);assert.throws(()=>scriptSegments(md.replace('01:00–02:00','01:10–02:00')),/timestamps/);});
+test('rejects nonexistent slides, reordered and missing segments',()=>{assert.ok(validateCues({cues},segments,[1]));assert.throws(()=>validateCues({cues:[cues[0]]},segments,[1]),/every/);assert.throws(()=>validateCues({cues:[{...cues[0],slide:9},cues[1]]},segments,[1]),/Invalid/);assert.throws(()=>validateCues({cues:[cues[1],cues[0]]},segments,[1]),/Invalid/);});

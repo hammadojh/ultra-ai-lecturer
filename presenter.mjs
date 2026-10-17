@@ -15,7 +15,7 @@ export class Presenter {
   async clip(segment){
     if(!this.cache.has(segment.id)){
       const promise=(async()=>{
-        const response=await fetch('/api/speech',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({segmentId:segment.id})});
+        const response=await fetch(segment.prepared?'/api/authoring-playback':'/api/speech',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(segment.prepared?{text:segment.text}:{segmentId:segment.id})});
         const data=await response.json();if(!response.ok)throw new Error(data.error||'Speech unavailable');
         const bytes=Uint8Array.from(atob(data.audio),c=>c.charCodeAt(0));
         const audio=await this.head.audioCtx.decodeAudioData(bytes.buffer);

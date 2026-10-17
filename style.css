@@ -46,3 +46,4 @@
 .checkpoint-panel{padding:9px;margin-bottom:10px}.checkpoint-panel p{margin-top:4px}
 .hand-marker{position:absolute;top:-13px;transform:translateX(-50%);display:grid;place-items:center;width:21px;height:21px;border-radius:50%;background:#2447ce;color:white;border:2px solid var(--paper);font-size:9px;font-weight:700;z-index:2}
 @media(max-width:760px){.questions{min-height:540px}.question-list{min-height:270px;max-height:420px}}
+.authored-classroom #slide-content{position:absolute;inset:0;padding:0;display:block}.authored-classroom #classroom-slide-image{width:100%;height:100%;object-fit:contain}.authored-classroom #classroom-annotations{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.authored-classroom .slide-meta,.authored-classroom .stage-bottom{display:none}.authored-classroom .floating-presenter,.authored-classroom .caption,.authored-classroom .waiting-state{z-index:3}
