@@ -5,7 +5,7 @@ import { Presenter } from './presenter.mjs';
 const $ = id => document.getElementById(id);
 const player = new LecturePlayer(lecture.segments.map(s=>({...s})),{checkpoints:true});
 const discussion=new Discussion(lecture.discussion);
-let feedbackSegment=null,feedbackOffset=0,feedbackStarted=false,feedbackItem=null,discussionRequest=null,discussionEpoch=0;
+let feedbackSegment=null,feedbackOffset=0,feedbackStarted=false,feedbackReady=false,feedbackItem=null,discussionRequest=null,discussionEpoch=0;
 const messageNodes=new Map();
 const presenter=new Presenter($('avatar-3d'),message=>{
  $('presenter-status').textContent=message;
@@ -23,6 +23,7 @@ function startSpeech(){
   onError:error=>{speakingId=null;player.pause();$('voice-error').textContent=error.message+' Resume to retry, or turn off Lecturer voice for silent playback.';$('voice-error').hidden=false;sync();}
  });
 }
+const handEvents=[];
 let current = 0, captions = true, raised = false, questionCount = 0;
 let drawnSlide = null;
 let activityPosted = false;
@@ -30,7 +31,7 @@ let answerSubmitted = false;
 let viewedSlide = null;
 const formatTime = seconds => `${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`;
 function sync(){
- if(player.state==='discussion'&&discussion.state==='idle')discussion.start();
+ if(player.state==='discussion'&&['idle','closed'].includes(discussion.state))discussion.start({final:!!player.segment.finalCheckpoint});
  const segment=player.segment;
  current=lecture.slides.findIndex(s=>s.id===(viewedSlide ?? segment.slide));
  const slide=lecture.slides[current];
@@ -90,7 +91,7 @@ function frame(now){
 }
 requestAnimationFrame(frame);
 $('play').onclick=()=>{if(player.state==='playing'){if(presenter.position!==null)player.offset=presenter.position;player.pause();stopSpeech();}else player.play();resetClock();sync();startSpeech();};
-$('restart').onclick=()=>{discussionEpoch++;discussionRequest?.abort();discussion.reset();feedbackSegment=null;feedbackOffset=0;feedbackItem=null;messageNodes.clear();questionCount=0;$('question-count').textContent='0';$('question-list').replaceChildren();stopSpeech();viewedSlide=null;player.restart();resetClock();sync();};
+$('restart').onclick=()=>{discussionEpoch++;discussionRequest?.abort();discussion.reset();handEvents.length=0;raised=false;$('hand').setAttribute('aria-pressed','false');$('hand').setAttribute('aria-label','Raise hand');$('hand').title='Raise hand';feedbackSegment=null;feedbackOffset=0;feedbackItem=null;messageNodes.clear();questionCount=0;$('question-count').textContent='0';$('question-list').replaceChildren();stopSpeech();viewedSlide=null;player.restart();resetClock();sync();};
 function browseSlide(index){
  if(index<0||index>=lecture.slides.length)return;
  if(['activity','discussion'].includes(player.state))viewedSlide=lecture.slides[index].id;
@@ -101,11 +102,27 @@ $('prev').onclick=()=>browseSlide(current-1);
 $('next').onclick=()=>browseSlide(current+1);
 document.addEventListener('visibilitychange',()=>{if(document.hidden){player.pause();stopSpeech();sync();}resetClock();});
 $('captions').onclick=()=>{captions=!captions;$('captions').setAttribute('aria-pressed',captions);$('captions').querySelector('span').textContent=`Captions ${captions?'on':'off'}`;$('caption').hidden=!captions;};
-$('hand').onclick=()=>{raised=!raised;$('hand').setAttribute('aria-pressed',raised);$('hand').querySelector('span').textContent=raised?'Lower hand':'Raise hand';$('hand-status').textContent=raised?'Hand raised. Type your question; the lecturer will address it at the checkpoint.':'';};
+function acknowledgeHand(){
+ if(!raised||!discussion.raiseHand())return;
+ appendMessage('AI LECTURER','Omar, I see your hand. Please type your question in the chat.','Your question window is open.','lecturer-message');
+ $('hand-status').textContent='Omar, you have the floor. Type and submit your question.';
+ $('question').focus();
+}
+$('hand').onclick=()=>{
+ raised=!raised;if(raised)handEvents.push({segment:player.index,fraction:player.offset/player.segment.duration});$('hand').setAttribute('aria-pressed',raised);
+ $('hand').querySelector('span').textContent=raised?'Lower hand':'Raise hand';
+ $('hand').setAttribute('aria-label',raised?'Lower hand':'Raise hand');$('hand').title=raised?'Lower hand':'Raise hand';renderCheckpoints();
+ $('hand-status').textContent=raised?'Hand raised. You’ll be invited to ask at the next available discussion turn.':'';
+ if(raised&&!(player.state==='discussion'&&discussion.state==='followup')){
+  const timing=player.state==='discussion'?'after this response, during this checkpoint':player.state==='completed'?'when you restart the lecture':'during the next checkpoint';
+  appendMessage('AI LECTURER',`Omar, I see you raised your hand. I’ll respond to you ${timing}.`,'Hand acknowledged','lecturer-message');
+ }
+ acknowledgeHand();
+};
 function appendMessage(author,value,status,className=''){
  if(questionCount===0)$('question-list').replaceChildren();
  const item=document.createElement('article');item.className='question-item '+className;
- const label=document.createElement('small');label.textContent=author;
+ const label=document.createElement('small');label.textContent=author==='AI LECTURER'?'Lecturer':author==='YOU'?'Omar':author;
  const text=document.createElement('p');text.textContent=value;
  const context=document.createElement('small');context.textContent=status;
  item.append(label,text,context);$('question-list').append(item);$('question-count').textContent=++questionCount;
@@ -120,27 +137,28 @@ function updateTimer(){
 function updateComposer(){
  const waiting=player.state==='activity';
  const submitted=waiting&&answerSubmitted;
- $('question').placeholder=submitted?'Your answer is submitted. Waiting for the class…':waiting?'Type your answer…':'Ask a question…';
- $('message-label').textContent=submitted?'Answer submitted':waiting?'Your answer':'Your message';
- $('question').disabled=submitted;
+ $('question').placeholder=submitted?'Ask a follow-up question…':waiting?'Type your answer…':'Ask a question…';
+ $('message-label').textContent=submitted?'Your message':waiting?'Your answer':'Your message';
+ $('question').disabled=false;
  const button=$('question-form').querySelector('button[type=submit]');
- button.disabled=submitted;button.textContent=submitted?'Submitted':'Submit ↗';
+ button.disabled=false;button.textContent='↑';
  $('chat-waiting').querySelector('strong').textContent=submitted?'Waiting for other students':'Waiting for your answer';
  $('chat-waiting').querySelector('small').textContent=submitted?'The explanation resumes when time runs out':'Submit before the explanation resumes';
  $('waiting-label').textContent=submitted?'Waiting for the class':'Waiting for your answer';
  if(submitted){$('status').textContent='Waiting for the class';$('play').textContent='Waiting for the class';$('runtime-state').textContent='Answer submitted · waiting for the class';}
 }
 $('question-form').onsubmit=e=>{
- e.preventDefault();if(player.state==='activity'&&answerSubmitted)return;const value=$('question').value.trim();
+ e.preventDefault();const value=$('question').value.trim();
  if(!value){$('question').setCustomValidity('Please write a message.');$('question').reportValidity();return;}
- const isAnswer=player.state==='activity';
+ const isAnswer=player.state==='activity'&&!answerSubmitted;
  const message=discussion.add(value,isAnswer?'answer':'question');
  const node=appendMessage('YOU',value,isAnswer?'Answer submitted · awaiting checkpoint':`Queued for checkpoint · slide ${current+1}`);messageNodes.set(message.id,node);
- $('question').value='';
- if(isAnswer){answerSubmitted=true;sync();}
+ $('question').value='';discussion.typing(false);
+ if(raised){raised=false;$('hand').setAttribute('aria-pressed','false');$('hand').querySelector('span').textContent='Raise hand';$('hand-status').textContent='Question received. It will be addressed in the next response.';}
+ if(isAnswer){answerSubmitted=true;player.completeAnswers();viewedSlide=null;sync();}
  renderDiscussion();
 };
-$('question').oninput=()=>$('question').setCustomValidity('');
+$('question').oninput=()=>{$('question').setCustomValidity('');discussion.typing(!!$('question').value.trim());};
 sync();
 
 function showLibrary(){player.pause();stopSpeech();sync();document.body.classList.remove('focus-mode','chat-collapsed');$('toggle-chat').hidden=true;$('toggle-chat').textContent='Hide chat';$('toggle-chat').setAttribute('aria-expanded','true');$('focus').setAttribute('aria-pressed','false');$('focus').querySelector('span').textContent='Focus mode';$('library').hidden=false;$('classroom-view').hidden=true;$('library-nav').setAttribute('aria-current','page');window.scrollTo(0,0);}
@@ -160,24 +178,34 @@ export { player, presenter, discussion };
 
 function renderDiscussion(){
  const active=player.state==='discussion';
+ if(active)acknowledgeHand();
+ renderCheckpoints();
  $('voice-enabled').disabled=active;
  $('checkpoint-panel').hidden=!active;
+ const awaitingFollowup=active&&discussion.state==='followup';
+ $('followup-waiting').hidden=!awaitingFollowup;
+ if(awaitingFollowup){
+ $('followup-timer').hidden=discussion.typingRemaining>0;
+ $('followup-timer').textContent=formatTime(Math.ceil(Math.min(discussion.idle,discussion.remaining)));
+ $('followup-waiting').querySelector('strong').textContent=discussion.typingRemaining>0?'Waiting for student question…':'Omar, any follow-up questions?';
+ $('followup-waiting').querySelector('small').textContent=discussion.typingRemaining>0?'Take your time typing. Submit when ready.':discussion.final?'Q&A closes when this timer ends.':'The lecture continues when this timer ends.';
+ }
  for(const message of discussion.messages){const node=messageNodes.get(message.id);if(node)node.textContent=({queued:'Queued for checkpoint',selected:'Included in current response',addressed:'Addressed',deferred:'Deferred: '+(message.reason||'For later')})[message.status];}
  if(!active)return;
  const labels={reviewing:'Reviewing class messages',speaking:'Addressing the class',followup:'Any follow-up questions?',closed:'Returning to the lecture'};
  $('checkpoint-title').textContent=labels[discussion.state]||'Class discussion';
- $('checkpoint-time').textContent=formatTime(Math.ceil(discussion.state==='followup'?discussion.idle:discussion.remaining));
- $('checkpoint-detail').textContent=discussion.state==='followup'?`Follow-up window · ${formatTime(Math.ceil(discussion.remaining))} discussion time left`:'New questions stay queued until this response finishes.';
+ $('checkpoint-time').textContent=discussion.typingRemaining>0&&discussion.state==='followup'?'Typing…':discussion.final&&discussion.state!=='followup'?'Final Q&A':formatTime(Math.ceil(discussion.state==='followup'?Math.min(discussion.idle,discussion.remaining):discussion.remaining));
+ $('checkpoint-detail').textContent=discussion.state==='followup'?discussion.final?'Final Q&A · ask about anything in this lecture':`Follow-up window · ${formatTime(Math.ceil(discussion.remaining))} discussion time left`:'New questions stay queued until this response finishes.';
  $('status').textContent=labels[discussion.state]||'Class discussion';
- $('play').textContent='Checkpoint discussion';$('runtime-state').textContent='Lecture resumes automatically after discussion';
- $('caption').textContent=discussion.state==='speaking'&&feedbackSegment?feedbackSegment.text:discussion.state==='reviewing'?'Let’s look at your answers and questions together.':'You can ask a follow-up question before we continue.';
+ $('play').textContent='Checkpoint discussion';$('runtime-state').textContent=discussion.final?'Final Q&A · lecture ends after discussion':'Lecture resumes automatically after discussion';
+ $('caption').textContent=discussion.state==='speaking'&&feedbackSegment?(!voiceEnabled||feedbackReady?feedbackSegment.text:'Thinking…'):discussion.state==='reviewing'?'Thinking…':'You can ask a follow-up question before we continue.';
  $('question').disabled=false;$('question').placeholder='Ask a follow-up question…';$('message-label').textContent='Your follow-up';
- const button=$('question-form').querySelector('button[type=submit]');button.disabled=false;button.textContent='Submit ↗';
+ const button=$('question-form').querySelector('button[type=submit]');button.disabled=false;button.textContent='↑';
 }
 function finishDiscussion(){
  discussionRequest?.abort();discussionRequest=null;discussionEpoch++;
  stopSpeech();feedbackSegment=null;feedbackOffset=0;feedbackItem=null;viewedSlide=null;
- appendMessage('AI LECTURER','Let’s continue with the lesson.','Discussion closed; deferred messages remain visible.','lecturer-message');
+ appendMessage('AI LECTURER',player.segment.finalCheckpoint?'Thank you, Omar. That concludes our lecture and Q&A.':'Let’s continue with the lesson.','Discussion closed; deferred messages remain visible.','lecturer-message');
  player.continue();resetClock();sync();startSpeech();
 }
 function stepDiscussion(dt){
@@ -193,12 +221,12 @@ async function requestFeedback(){
  const batch=discussion.select();if(!batch)return;
  const epoch=discussionEpoch;discussionRequest=new AbortController();renderDiscussion();
  try{
-  const response=await fetch('/api/discuss',{method:'POST',headers:{'Content-Type':'application/json'},signal:discussionRequest.signal,body:JSON.stringify({messages:batch.map(({id,text,kind})=>({id,text,kind})),history:discussion.history})});
+  const response=await fetch('/api/discuss',{method:'POST',headers:{'Content-Type':'application/json'},signal:discussionRequest.signal,body:JSON.stringify({messages:batch.map(({id,text,kind})=>({id,text,kind})),history:discussion.history,checkpointId:player.segment.id})});
   const result=await response.json();if(!response.ok)throw new Error(result.error||'Feedback unavailable');
   if(epoch!==discussionEpoch||discussion.state!=='reviewing')return;
   if(discussion.remaining<result.text.split(/\s+/).length/2.5+8){discussion.close('Not enough time to deliver feedback');return;}
-  discussion.accept(result);feedbackSegment={id:result.segmentId,text:result.text};feedbackOffset=0;feedbackStarted=false;
-  feedbackItem=appendMessage('AI LECTURER',result.text,voiceEnabled?'Preparing spoken feedback · '+result.model:'Read the feedback · '+result.model,'lecturer-message');
+  discussion.accept(result);feedbackSegment={id:result.segmentId,text:result.text};feedbackOffset=0;feedbackStarted=false;feedbackReady=false;
+  feedbackItem=appendMessage('AI LECTURER',voiceEnabled?'Thinking…':result.text,voiceEnabled?'Preparing spoken feedback · '+result.model:'Read the feedback · '+result.model,'lecturer-message');
   renderDiscussion();
  }catch(error){
   if(epoch!==discussionEpoch||discussion.state!=='reviewing')return;
@@ -211,7 +239,7 @@ function startFeedback(){
  if(!feedbackSegment||feedbackStarted)return;feedbackStarted=true;
  const epoch=discussionEpoch;
  presenter.play(feedbackSegment,feedbackOffset,{
-  onReady:()=>{if(feedbackItem)feedbackItem.textContent='Speaking feedback';},
+  onReady:()=>{if(epoch!==discussionEpoch)return;feedbackReady=true;if(feedbackItem){feedbackItem.textContent='Speaking feedback';feedbackItem.parentElement.querySelector('p').textContent=feedbackSegment.text;}renderDiscussion();},
   onEnd:()=>{if(epoch===discussionEpoch&&player.state==='discussion')finishFeedback();},
   onError:()=>{if(epoch!==discussionEpoch)return;feedbackStarted=false;discussion.fail('Feedback speech failed');if(feedbackItem)feedbackItem.textContent='Speech failed · messages deferred';feedbackSegment=null;renderDiscussion();}
  });
@@ -219,4 +247,30 @@ function startFeedback(){
 function finishFeedback(){
  discussion.delivered(feedbackSegment.text);feedbackStarted=false;feedbackOffset=0;feedbackSegment=null;
  if(feedbackItem)feedbackItem.textContent='Feedback delivered';feedbackItem=null;renderDiscussion();
+}
+
+function renderCheckpoints(){
+ const hands=$('timeline-hands');hands.replaceChildren();
+ handEvents.forEach(event=>{
+ const position=player.segments.slice(0,event.segment).reduce((sum,s)=>sum+s.duration,0)+player.segments[event.segment].duration*event.fraction;
+ const pin=document.createElement('span');pin.className='hand-marker';pin.textContent='O';pin.style.left=Math.min(98,Math.max(2,position/player.duration*100))+'%';
+ pin.title='Omar raised a hand';pin.setAttribute('aria-label','Omar raised a hand');hands.append(pin);
+ });
+ const container=$('timeline-checkpoints');
+ container.replaceChildren();
+ let elapsed=0;
+ player.segments.forEach((segment,index)=>{
+  elapsed+=segment.duration;
+  if(!segment.holdAfter&&!segment.finalCheckpoint)return;
+  const marker=document.createElement('span');
+  const active=player.index===index&&['activity','discussion'].includes(player.state);
+  const passed=player.index>index||player.state==='completed';
+  marker.className='checkpoint-marker'+(active?' current':passed?' passed':'');
+  marker.style.left=(elapsed/player.duration*100)+'%';
+  const label=segment.finalCheckpoint?'Final Q&A':'Q&A';
+  marker.textContent=active?`◆ ${label} · now`:passed?`✓ ${label}`:`◆ ${label}`;
+  marker.title=segment.finalCheckpoint?'Final open Q&A for all remaining questions':'Discussion checkpoint after the practice question';
+  if(segment.finalCheckpoint)marker.style.transform='translateX(-100%)';
+  container.append(marker);
+ });
 }

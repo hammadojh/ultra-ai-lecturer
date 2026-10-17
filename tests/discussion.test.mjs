@@ -30,3 +30,23 @@ test('response contract covers every ID once and rejects invented coverage',()=>
  assert.throws(()=>validateBatch([{id:'m1',text:'hi',kind:'invalid'}]));
  assert.equal(validateResponse({text:'Fourteen.',addressedIds:['m1'],deferredIds:['m2']},batch).deferredIds[0],'m2');
 });
+
+test('all answers received opens discussion immediately without skipping feedback',()=>{
+ const p=new LecturePlayer(lecture.segments,{checkpoints:true});p.play();p.tick(100);
+ assert.equal(p.state,'activity');assert.ok(p.answerRemaining>0);
+ p.completeAnswers();assert.equal(p.state,'discussion');assert.equal(p.answerRemaining,0);assert.equal(p.segment.id,'question');
+ p.completeAnswers();assert.equal(p.state,'discussion');
+ p.continue();assert.equal(p.segment.id,'answer');
+});
+test('typing holds the countdown and inactivity releases the lecturer',()=>{
+ const d=new Discussion();d.start();d.tick(10);d.typing(true);d.tick(15);
+ assert.equal(d.state,'followup');assert.equal(d.idle,2);
+ d.typing(true);d.tick(19);assert.equal(d.state,'followup');d.tick(1);assert.equal(d.state,'closed');
+});
+test('final checkpoint revisits deferred messages and stays open across responses',()=>{
+ const d=new Discussion();const m=d.add('Question');d.start();d.close();d.start({final:true});
+ assert.equal(m.status,'queued');d.select();d.tick(120);assert.equal(d.state,'reviewing');
+ d.accept({addressedIds:[m.id],deferredIds:[]});d.delivered('Answer');assert.equal(d.idle,30);
+ const p=new LecturePlayer(lecture.segments,{checkpoints:true});p.index=p.segments.length-1;p.play();p.tick(100);
+ assert.equal(p.state,'discussion');p.continue();assert.equal(p.state,'completed');
+});

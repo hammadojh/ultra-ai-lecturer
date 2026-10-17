@@ -52,12 +52,12 @@ const server=http.createServer(async(req,res)=>{
   if(url.pathname==='/api/discuss'&&req.method==='POST'){
    if(req.headers.origin&&!['http://127.0.0.1:4173','http://localhost:4173'].includes(req.headers.origin)){res.writeHead(403).end();return;}
    let body='';for await(const chunk of req){body+=chunk;if(body.length>24000){res.writeHead(413).end();return;}}
-   const {messages,history=[]}=JSON.parse(body);
+   const {messages,history=[],checkpointId="question"}=JSON.parse(body);
    if(!Array.isArray(history))throw new Error('Invalid discussion history');
    const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),40000);
    res.on('close',()=>{if(!res.writableEnded)controller.abort();});
    try{
-    const result=await generateFeedback(messages,history,controller.signal);
+    const result=await generateFeedback(messages,history,controller.signal,checkpointId);
     const id='feedback-'+randomUUID();
     for(const [key,value] of feedbackSegments)if(value.expires<Date.now())feedbackSegments.delete(key);
     if(feedbackSegments.size>=100)feedbackSegments.delete(feedbackSegments.keys().next().value);

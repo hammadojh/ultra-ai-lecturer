@@ -17,6 +17,6 @@ export const lecture = {
     {id:'output',slide:'relationship',duration:5,text:'Three times two gives us six. That is our output.',highlight:'output'},
     {id:'question',slide:'practice',duration:5,text:'Now try it. If the input is seven, what comes out?',highlight:'practice-prompt',holdAfter:true,answerSeconds:30,question:"If the input is 7 and the rule doubles it, what is the output?"},
     {id:'answer',slide:'practice',duration:6,text:'The output is fourteen. Seven times two equals fourteen.',reveal:'explanation'},
-    {id:'recap',slide:'practice',duration:5,text:'You identified the input, applied the rule, and predicted the output.',reveal:'explanation'}
+    {id:'recap',finalCheckpoint:true,slide:'practice',duration:5,text:'You identified the input, applied the rule, and predicted the output.',reveal:'explanation'}
   ]
 };

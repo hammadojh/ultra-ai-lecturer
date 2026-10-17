@@ -25,6 +25,11 @@ export class LecturePlayer {
     if(this.index===this.segments.length-1){this.state='completed';return;}
     this.index++; this.offset=0; this.answerRemaining=0; this.state='playing';
   }
+  completeAnswers() {
+    if(this.state!=='activity') return;
+    this.answerRemaining=0;
+    if(this.checkpoints)this.state='discussion';else this.continue();
+  }
   tick(seconds) {
     if(!Number.isFinite(seconds) || seconds<=0) return;
     if(this.state==='activity'){
@@ -37,6 +42,7 @@ export class LecturePlayer {
     while(this.offset>=this.segment.duration){
       const remainder=this.offset-this.segment.duration;
       this.offset=this.segment.duration;
+      if(this.segment.finalCheckpoint&&this.checkpoints){this.state='discussion';return;}
       if(this.segment.holdAfter){this.state='activity';this.answerRemaining=this.segment.answerSeconds ?? 30;return;}
       if(this.index===this.segments.length-1){this.state='completed';return;}
       this.index++; this.offset=remainder;

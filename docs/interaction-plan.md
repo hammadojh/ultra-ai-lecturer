@@ -14,7 +14,7 @@ At a checkpoint, collect every unaddressed student question and assessment respo
 
 Keep message IDs and coverage mappings. Messages progress through queued, selected, addressed, or explicitly deferred states. A message is only addressed after its associated feedback has actually been delivered; model selection alone does not count. Unrelated, out-of-scope, or time-limited items stay visible as deferred rather than silently disappearing.
 
-New messages arriving while the lecturer speaks enter the next batch. They must not restart or interrupt the current response. Student answer submission alone does not end a class response window. In a real shared session, the collection window can close when every expected participant has answered or its timer expires.
+New messages arriving while the lecturer speaks enter the next batch. They must not restart or interrupt the current response. The current solo preview treats Omar as the only student, so his answer closes collection immediately and opens discussion. Chat remains enabled for further questions, and generated feedback addresses Omar by name. In a shared session, collection closes when every expected participant has answered or its timer expires.
 
 ## Follow-up and time budget
 
@@ -34,7 +34,7 @@ Queued questions and raised hands do not change the Teaching state. The session 
 
 Use the existing sample lecture and presenter. Add one explicit checkpoint, real generated feedback for submitted answers/questions, grouped coverage tracking, a timed follow-up window, and automatic return to the approved script. Validate empty queues, duplicate questions, arrivals during speech, answer submission, generation failures, time limits, and exact resumption.
 
-The local preview can validate one browser's queue. Multi-student coverage and all-participants-answered behavior require authoritative shared session state, not the sample online roster. A student's tab visibility must not pause the class-wide clock once shared sessions are implemented.
+The local preview can validate one browser's queue. Multi-student coverage and all-participants-answered behavior require authoritative shared session state, not a client-side roster. A student's tab visibility must not pause the class-wide clock once shared sessions are implemented.
 
 ## Deferred avatar work
 
