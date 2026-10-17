@@ -4,6 +4,7 @@ const $ = id => document.getElementById(id);
 const player = new LecturePlayer(lecture.segments);
 let current = 0, captions = true, raised = false, questionCount = 0;
 let drawnSlide = null;
+let activityPosted = false;
 const formatTime = seconds => `${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`;
 function sync(){
  const segment=player.segment;
@@ -21,22 +22,36 @@ function sync(){
  $('chapter').textContent=slide.chapter;
  $('slide-number').textContent=`${String(current+1).padStart(2,'0')} / 03`;
  $('progress').textContent=`${current+1} of 3`;
- $('caption').textContent=player.state==='ready'?'Ready when you are. Start the scripted preview below.':player.state==='activity'?'Take your time. The lecture is waiting for you.':segment.text;
+ $('caption').textContent=player.state==='ready'?'Ready when you are. Start the scripted preview below.':player.state==='activity'?'Your turn. Submit your answer in the chat.':segment.text;
  const statuses={ready:'Ready to start',playing:'Presenting · no audio',paused:'Paused',activity:'Activity break',completed:'Lecture complete'};
  $('status').textContent=statuses[player.state];
+ const waiting=player.state==='activity';
+ document.querySelector('.stage').classList.toggle('waiting',waiting);
+ $('waiting-state').hidden=!waiting;
+ $('answer-timer').textContent=formatTime(Math.ceil(player.answerRemaining));
+ $('message-kind').querySelector('[value=answer]').disabled=!waiting;
+ if(waiting&&!activityPosted){
+  activityPosted=true;
+  appendMessage('AI LECTURER',segment.question,'Answer in the next 30 seconds.','lecturer-message');
+  $('message-kind').value='answer';
+  document.body.classList.remove('chat-collapsed');$('toggle-chat').textContent='Hide chat';$('toggle-chat').setAttribute('aria-expanded','true');
+ }
+ if(!waiting){activityPosted=false;$('message-kind').value='question';}
+ updateComposer();
  $('play').textContent=player.state==='playing'?'Pause':player.state==='ready'?'Start lecture':player.state==='completed'?'Completed':player.state==='activity'?'Waiting for your answer':'Resume';
  $('play').disabled=['activity','completed'].includes(player.state);
  $('prev').disabled=current===0; $('next').disabled=current===lecture.slides.length-1;
  $('elapsed').textContent=`${formatTime(player.elapsed)} / ${formatTime(player.duration)}`;
  $('timeline').value=player.elapsed; $('timeline').max=player.duration;
- $('runtime-state').textContent=player.state==='activity'?'Activity · continue on the slide':player.state==='completed'?'Complete · replay anytime':'Scripted preview · voice connects in Part 3';
+ $('runtime-state').textContent=player.state==='activity'?'Waiting for an answer · countdown on slide':player.state==='completed'?'Complete · replay anytime':'Scripted preview · voice connects in Part 3';
 }
 let lastTime=performance.now();
 function resetClock(){lastTime=performance.now();}
 function frame(now){
  const before=player.index, state=player.state;
- player.tick((now-lastTime)/1000);lastTime=now;
+ if(!document.hidden&&!$('classroom-view').hidden)player.tick((now-lastTime)/1000);lastTime=now;
  if(before!==player.index||state!==player.state)sync();
+ else if(player.state==='activity'){$('answer-timer').textContent=formatTime(Math.ceil(player.answerRemaining));}
  else if(player.state==='playing'){
   $('elapsed').textContent=`${formatTime(player.elapsed)} / ${formatTime(player.duration)}`;
   $('timeline').value=player.elapsed;
@@ -51,7 +66,27 @@ $('next').onclick=()=>{if(current<lecture.slides.length-1){player.seekSlide(lect
 document.addEventListener('visibilitychange',()=>{if(document.hidden){player.pause();sync();}resetClock();});
 $('captions').onclick=()=>{captions=!captions;$('captions').setAttribute('aria-pressed',captions);$('captions').querySelector('span').textContent=`Captions ${captions?'on':'off'}`;$('caption').hidden=!captions;};
 $('hand').onclick=()=>{raised=!raised;$('hand').setAttribute('aria-pressed',raised);$('hand').querySelector('span').textContent=raised?'Lower hand':'Raise hand';$('hand-status').textContent=raised?'Your hand is raised in this preview.':'';};
-$('question-form').onsubmit=e=>{e.preventDefault();const value=$('question').value.trim();if(!value){$('question').setCustomValidity('Please write a question.');$('question').reportValidity();return;}if(questionCount===0)$('question-list').replaceChildren();const item=document.createElement('article');item.className='question-item';const label=document.createElement('small');label.textContent='YOU';const state=document.createElement('span');state.className='queued';state.textContent='Queued · preview';const text=document.createElement('p');text.textContent=value;const context=document.createElement('small');context.textContent=`Slide ${current+1} · ${lecture.slides[current].chapter.split(' / ')[1]}`;item.append(label,state,text,context);$('question-list').append(item);$('question-count').textContent=++questionCount;$('question').value='';item.scrollIntoView({block:'nearest'});};
+function appendMessage(author,value,status,className=''){
+ if(questionCount===0)$('question-list').replaceChildren();
+ const item=document.createElement('article');item.className='question-item '+className;
+ const label=document.createElement('small');label.textContent=author;
+ const text=document.createElement('p');text.textContent=value;
+ const context=document.createElement('small');context.textContent=status;
+ item.append(label,text,context);$('question-list').append(item);$('question-count').textContent=++questionCount;
+ $('question-list').scrollTop=$('question-list').scrollHeight;
+}
+function updateComposer(){
+ $('question').placeholder=$('message-kind').value==='answer'?'Type your answer…':'Ask a question…';
+}
+$('message-kind').onchange=updateComposer;
+$('question-form').onsubmit=e=>{
+ e.preventDefault();const value=$('question').value.trim();
+ if(!value){$('question').setCustomValidity('Please write a message.');$('question').reportValidity();return;}
+ const isAnswer=player.state==='activity'&&$('message-kind').value==='answer';
+ appendMessage('YOU',value,isAnswer?'Answer submitted · not graded':`Question queued · slide ${current+1}`);
+ $('question').value='';
+ if(isAnswer){player.continue();resetClock();sync();}
+};
 $('question').oninput=()=>$('question').setCustomValidity('');
 sync();
 
