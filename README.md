@@ -50,8 +50,10 @@ We stop after each part and wait for user approval.
 
 1. Student classroom interface — approved.
 2. Scripted lecture runtime and timed chat activity — approved.
-3. First speaking 3D presenter — built; awaiting review. Remaining refinements include presenter/voice selection and delivery tuning.
-4. Grounded Q&A and assessments.
+3. First speaking 3D presenter — functional baseline accepted for continuing. Avatar visual quality and presenter/voice selection are deferred to a later review.
+4. Grounded Q&A and assessments — predefined checkpoints, grouped responses to all pending messages, bounded follow-up windows, and automatic return to teaching. See [the interaction plan](docs/interaction-plan.md).
 5. Admin studio: sources, extraction, lecture plans and scripts with approvals.
 6. Assets, HTML slide and detailed delivery generation; dependency tracking.
 7. Publishing and operation: authentication, versioned shared sessions and end-to-end validation.
+
+Later refinement: revisit avatar quality and presenter choices after the interaction flow has been validated.
