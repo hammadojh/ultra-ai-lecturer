@@ -5,15 +5,16 @@ const player = new LecturePlayer(lecture.segments);
 let current = 0, captions = true, raised = false, questionCount = 0;
 let drawnSlide = null;
 let activityPosted = false;
+let viewedSlide = null;
 const formatTime = seconds => `${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`;
 function sync(){
  const segment=player.segment;
- current=lecture.slides.findIndex(s=>s.id===segment.slide);
+ current=lecture.slides.findIndex(s=>s.id===(viewedSlide ?? segment.slide));
  const slide=lecture.slides[current];
  if(drawnSlide!==slide.id){
   $('slide-content').innerHTML=`<div><h2 class="slide-title">${slide.title}</h2><p class="slide-copy">${slide.body}</p>${slide.html}</div>`;
   drawnSlide=slide.id;
-  if($('continue-lecture')) $('continue-lecture').onclick=()=>{player.continue();resetClock();sync();};
+  if($('continue-lecture')) $('continue-lecture').onclick=()=>{viewedSlide=null;player.continue();resetClock();sync();};
  }
  document.querySelectorAll('.cue-active').forEach(el=>el.classList.remove('cue-active'));
  if(segment.highlight && $(segment.highlight)) $(segment.highlight).classList.add('cue-active');
@@ -28,15 +29,14 @@ function sync(){
  const waiting=player.state==='activity';
  document.querySelector('.stage').classList.toggle('waiting',waiting);
  $('waiting-state').hidden=!waiting;
- $('answer-timer').textContent=formatTime(Math.ceil(player.answerRemaining));
- $('message-kind').querySelector('[value=answer]').disabled=!waiting;
+ updateTimer();
+ $('chat-waiting').hidden=!waiting;
  if(waiting&&!activityPosted){
   activityPosted=true;
   appendMessage('AI LECTURER',segment.question,'Answer in the next 30 seconds.','lecturer-message');
-  $('message-kind').value='answer';
   document.body.classList.remove('chat-collapsed');$('toggle-chat').textContent='Hide chat';$('toggle-chat').setAttribute('aria-expanded','true');
  }
- if(!waiting){activityPosted=false;$('message-kind').value='question';}
+ if(!waiting){activityPosted=false;}
  updateComposer();
  $('play').textContent=player.state==='playing'?'Pause':player.state==='ready'?'Start lecture':player.state==='completed'?'Completed':player.state==='activity'?'Waiting for your answer':'Resume';
  $('play').disabled=['activity','completed'].includes(player.state);
@@ -50,8 +50,9 @@ function resetClock(){lastTime=performance.now();}
 function frame(now){
  const before=player.index, state=player.state;
  if(!document.hidden&&!$('classroom-view').hidden)player.tick((now-lastTime)/1000);lastTime=now;
+ if(state==='activity'&&player.state!=='activity')viewedSlide=null;
  if(before!==player.index||state!==player.state)sync();
- else if(player.state==='activity'){$('answer-timer').textContent=formatTime(Math.ceil(player.answerRemaining));}
+ else if(player.state==='activity'){updateTimer();}
  else if(player.state==='playing'){
   $('elapsed').textContent=`${formatTime(player.elapsed)} / ${formatTime(player.duration)}`;
   $('timeline').value=player.elapsed;
@@ -60,9 +61,15 @@ function frame(now){
 }
 requestAnimationFrame(frame);
 $('play').onclick=()=>{if(player.state==='playing')player.pause();else player.play();resetClock();sync();};
-$('restart').onclick=()=>{player.restart();resetClock();sync();};
-$('prev').onclick=()=>{if(current>0){player.seekSlide(lecture.slides[current-1].id);sync();}};
-$('next').onclick=()=>{if(current<lecture.slides.length-1){player.seekSlide(lecture.slides[current+1].id);sync();}};
+$('restart').onclick=()=>{viewedSlide=null;player.restart();resetClock();sync();};
+function browseSlide(index){
+ if(index<0||index>=lecture.slides.length)return;
+ if(player.state==='activity')viewedSlide=lecture.slides[index].id;
+ else {viewedSlide=null;player.seekSlide(lecture.slides[index].id);}
+ sync();
+}
+$('prev').onclick=()=>browseSlide(current-1);
+$('next').onclick=()=>browseSlide(current+1);
 document.addEventListener('visibilitychange',()=>{if(document.hidden){player.pause();sync();}resetClock();});
 $('captions').onclick=()=>{captions=!captions;$('captions').setAttribute('aria-pressed',captions);$('captions').querySelector('span').textContent=`Captions ${captions?'on':'off'}`;$('caption').hidden=!captions;};
 $('hand').onclick=()=>{raised=!raised;$('hand').setAttribute('aria-pressed',raised);$('hand').querySelector('span').textContent=raised?'Lower hand':'Raise hand';$('hand-status').textContent=raised?'Your hand is raised in this preview.':'';};
@@ -75,17 +82,23 @@ function appendMessage(author,value,status,className=''){
  item.append(label,text,context);$('question-list').append(item);$('question-count').textContent=++questionCount;
  $('question-list').scrollTop=$('question-list').scrollHeight;
 }
-function updateComposer(){
- $('question').placeholder=$('message-kind').value==='answer'?'Type your answer…':'Ask a question…';
+function updateTimer(){
+ const remaining=formatTime(Math.ceil(player.answerRemaining));
+ $('answer-timer').textContent=remaining;
+ $('chat-answer-timer').textContent=remaining;
 }
-$('message-kind').onchange=updateComposer;
+function updateComposer(){
+ const waiting=player.state==='activity';
+ $('question').placeholder=waiting?'Type your answer…':'Ask a question…';
+ $('message-label').textContent=waiting?'Your answer':'Your message';
+}
 $('question-form').onsubmit=e=>{
  e.preventDefault();const value=$('question').value.trim();
  if(!value){$('question').setCustomValidity('Please write a message.');$('question').reportValidity();return;}
- const isAnswer=player.state==='activity'&&$('message-kind').value==='answer';
+ const isAnswer=player.state==='activity';
  appendMessage('YOU',value,isAnswer?'Answer submitted · not graded':`Question queued · slide ${current+1}`);
  $('question').value='';
- if(isAnswer){player.continue();resetClock();sync();}
+ if(isAnswer){viewedSlide=null;player.continue();resetClock();sync();}
 };
 $('question').oninput=()=>$('question').setCustomValidity('');
 sync();
