@@ -5,6 +5,7 @@ const player = new LecturePlayer(lecture.segments);
 let current = 0, captions = true, raised = false, questionCount = 0;
 let drawnSlide = null;
 let activityPosted = false;
+let answerSubmitted = false;
 let viewedSlide = null;
 const formatTime = seconds => `${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`;
 function sync(){
@@ -23,7 +24,7 @@ function sync(){
  $('chapter').textContent=slide.chapter;
  $('slide-number').textContent=`${String(current+1).padStart(2,'0')} / 03`;
  $('progress').textContent=`${current+1} of 3`;
- $('caption').textContent=player.state==='ready'?'Ready when you are. Start the scripted preview below.':player.state==='activity'?'Your turn. Submit your answer in the chat.':segment.text;
+ $('caption').textContent=player.state==='ready'?'Ready when you are. Start the scripted preview below.':player.state==='activity'?(answerSubmitted?'Answer submitted. Waiting for the class.':'Your turn. Submit your answer in the chat.'):segment.text;
  const statuses={ready:'Ready to start',playing:'Presenting · no audio',paused:'Paused',activity:'Activity break',completed:'Lecture complete'};
  $('status').textContent=statuses[player.state];
  const waiting=player.state==='activity';
@@ -32,11 +33,11 @@ function sync(){
  updateTimer();
  $('chat-waiting').hidden=!waiting;
  if(waiting&&!activityPosted){
-  activityPosted=true;
+  activityPosted=true;answerSubmitted=false;
   appendMessage('AI LECTURER',segment.question,'Answer in the next 30 seconds.','lecturer-message');
   document.body.classList.remove('chat-collapsed');$('toggle-chat').textContent='Hide chat';$('toggle-chat').setAttribute('aria-expanded','true');
  }
- if(!waiting){activityPosted=false;}
+ if(!waiting){activityPosted=false;answerSubmitted=false;}
  updateComposer();
  $('play').textContent=player.state==='playing'?'Pause':player.state==='ready'?'Start lecture':player.state==='completed'?'Completed':player.state==='activity'?'Waiting for your answer':'Resume';
  $('play').disabled=['activity','completed'].includes(player.state);
@@ -89,16 +90,24 @@ function updateTimer(){
 }
 function updateComposer(){
  const waiting=player.state==='activity';
- $('question').placeholder=waiting?'Type your answer…':'Ask a question…';
- $('message-label').textContent=waiting?'Your answer':'Your message';
+ const submitted=waiting&&answerSubmitted;
+ $('question').placeholder=submitted?'Your answer is submitted. Waiting for the class…':waiting?'Type your answer…':'Ask a question…';
+ $('message-label').textContent=submitted?'Answer submitted':waiting?'Your answer':'Your message';
+ $('question').disabled=submitted;
+ const button=$('question-form').querySelector('button[type=submit]');
+ button.disabled=submitted;button.textContent=submitted?'Submitted':'Submit ↗';
+ $('chat-waiting').querySelector('strong').textContent=submitted?'Waiting for other students':'Waiting for your answer';
+ $('chat-waiting').querySelector('small').textContent=submitted?'The explanation resumes when time runs out':'Submit before the explanation resumes';
+ $('waiting-label').textContent=submitted?'Waiting for the class':'Waiting for your answer';
+ if(submitted){$('status').textContent='Waiting for the class';$('play').textContent='Waiting for the class';$('runtime-state').textContent='Answer submitted · waiting for the class';}
 }
 $('question-form').onsubmit=e=>{
- e.preventDefault();const value=$('question').value.trim();
+ e.preventDefault();if(player.state==='activity'&&answerSubmitted)return;const value=$('question').value.trim();
  if(!value){$('question').setCustomValidity('Please write a message.');$('question').reportValidity();return;}
  const isAnswer=player.state==='activity';
  appendMessage('YOU',value,isAnswer?'Answer submitted · not graded':`Question queued · slide ${current+1}`);
  $('question').value='';
- if(isAnswer){viewedSlide=null;player.continue();resetClock();sync();}
+ if(isAnswer){answerSubmitted=true;sync();}
 };
 $('question').oninput=()=>$('question').setCustomValidity('');
 sync();
