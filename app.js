@@ -1,14 +1,18 @@
 import { lecture } from './lecture.mjs';
 import { LecturePlayer } from './player.mjs';
+import { Discussion } from './discussion.mjs';
 import { Presenter } from './presenter.mjs';
 const $ = id => document.getElementById(id);
-const player = new LecturePlayer(lecture.segments.map(s=>({...s})));
+const player = new LecturePlayer(lecture.segments.map(s=>({...s})),{checkpoints:true});
+const discussion=new Discussion(lecture.discussion);
+let feedbackSegment=null,feedbackOffset=0,feedbackStarted=false,feedbackItem=null,discussionRequest=null,discussionEpoch=0;
+const messageNodes=new Map();
 const presenter=new Presenter($('avatar-3d'),message=>{
  $('presenter-status').textContent=message;
  $('voice-status').textContent=message;
 });
 let voiceEnabled=true, speakingId=null, muted=false;
-function stopSpeech(){presenter.stop();speakingId=null;}
+function stopSpeech(){if(player.state==='discussion'&&presenter.position!==null)feedbackOffset=presenter.position;feedbackStarted=false;presenter.stop();speakingId=null;}
 function startSpeech(){
  if(!voiceEnabled||player.state!=='playing'||speakingId===player.segment.id)return;
  const segment=player.segment;speakingId=segment.id;
@@ -26,6 +30,7 @@ let answerSubmitted = false;
 let viewedSlide = null;
 const formatTime = seconds => `${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`;
 function sync(){
+ if(player.state==='discussion'&&discussion.state==='idle')discussion.start();
  const segment=player.segment;
  current=lecture.slides.findIndex(s=>s.id===(viewedSlide ?? segment.slide));
  const slide=lecture.slides[current];
@@ -42,7 +47,7 @@ function sync(){
  $('slide-number').textContent=`${String(current+1).padStart(2,'0')} / 03`;
  $('progress').textContent=`${current+1} of 3`;
  $('caption').textContent=player.state==='ready'?'Ready when you are. Start the scripted preview below.':player.state==='activity'?(answerSubmitted?'Answer submitted. Waiting for the class.':'Your turn. Submit your answer in the chat.'):segment.text;
- const statuses={ready:'Ready to start',playing:voiceEnabled?'Presenting':'Presenting · silent',paused:'Paused',activity:'Activity break',completed:'Lecture complete'};
+ const statuses={ready:'Ready to start',playing:voiceEnabled?'Presenting':'Presenting · silent',paused:'Paused',activity:'Activity break',discussion:'Class discussion',completed:'Lecture complete'};
  $('status').textContent=statuses[player.state];
  const waiting=player.state==='activity';
  document.querySelector('.stage').classList.toggle('waiting',waiting);
@@ -56,24 +61,27 @@ function sync(){
  }
  if(!waiting){activityPosted=false;answerSubmitted=false;}
  $('play').textContent=player.state==='playing'?'Pause':player.state==='ready'?'Start lecture':player.state==='completed'?'Completed':player.state==='activity'?'Waiting for your answer':'Resume';
- $('play').disabled=['activity','completed'].includes(player.state);
+ $('play').disabled=['activity','discussion','completed'].includes(player.state);
  $('prev').disabled=current===0; $('next').disabled=current===lecture.slides.length-1;
  $('elapsed').textContent=`${formatTime(player.elapsed)} / ${formatTime(player.duration)}`;
  $('timeline').value=player.elapsed; $('timeline').max=player.duration;
  $('runtime-state').textContent=player.state==='activity'?'Waiting for an answer · countdown on slide':player.state==='completed'?'Complete · replay anytime':voiceEnabled?'Scripted lecture · audio synchronized':'Scripted preview · silent';
  updateComposer();
+ renderDiscussion();
 }
 let lastTime=performance.now();
 function resetClock(){lastTime=performance.now();}
 function frame(now){
  const before=player.index, state=player.state;
  if(!document.hidden&&!$('classroom-view').hidden){
-  if(player.state==='playing'&&voiceEnabled){const position=presenter.position;if(position!==null)player.offset=Math.min(position,player.segment.duration-.0001);}
+  if(player.state==='discussion'){discussion.tick((now-lastTime)/1000);stepDiscussion((now-lastTime)/1000);}
+  else if(player.state==='playing'&&voiceEnabled){const position=presenter.position;if(position!==null)player.offset=Math.min(position,player.segment.duration-.0001);}
   else player.tick((now-lastTime)/1000);
  }lastTime=now;
  if(state==='activity'&&player.state!=='activity')viewedSlide=null;
  if(before!==player.index||state!==player.state){sync();if(player.state==='playing')startSpeech();}
  else if(player.state==='activity'){updateTimer();}
+ else if(player.state==='discussion'){renderDiscussion();}
  else if(player.state==='playing'){
   $('elapsed').textContent=`${formatTime(player.elapsed)} / ${formatTime(player.duration)}`;
   $('timeline').value=player.elapsed;
@@ -82,10 +90,10 @@ function frame(now){
 }
 requestAnimationFrame(frame);
 $('play').onclick=()=>{if(player.state==='playing'){if(presenter.position!==null)player.offset=presenter.position;player.pause();stopSpeech();}else player.play();resetClock();sync();startSpeech();};
-$('restart').onclick=()=>{stopSpeech();viewedSlide=null;player.restart();resetClock();sync();};
+$('restart').onclick=()=>{discussionEpoch++;discussionRequest?.abort();discussion.reset();feedbackSegment=null;feedbackOffset=0;feedbackItem=null;messageNodes.clear();questionCount=0;$('question-count').textContent='0';$('question-list').replaceChildren();stopSpeech();viewedSlide=null;player.restart();resetClock();sync();};
 function browseSlide(index){
  if(index<0||index>=lecture.slides.length)return;
- if(player.state==='activity')viewedSlide=lecture.slides[index].id;
+ if(['activity','discussion'].includes(player.state))viewedSlide=lecture.slides[index].id;
  else {stopSpeech();viewedSlide=null;player.seekSlide(lecture.slides[index].id);}
  sync();
 }
@@ -93,7 +101,7 @@ $('prev').onclick=()=>browseSlide(current-1);
 $('next').onclick=()=>browseSlide(current+1);
 document.addEventListener('visibilitychange',()=>{if(document.hidden){player.pause();stopSpeech();sync();}resetClock();});
 $('captions').onclick=()=>{captions=!captions;$('captions').setAttribute('aria-pressed',captions);$('captions').querySelector('span').textContent=`Captions ${captions?'on':'off'}`;$('caption').hidden=!captions;};
-$('hand').onclick=()=>{raised=!raised;$('hand').setAttribute('aria-pressed',raised);$('hand').querySelector('span').textContent=raised?'Lower hand':'Raise hand';$('hand-status').textContent=raised?'Your hand is raised in this preview.':'';};
+$('hand').onclick=()=>{raised=!raised;$('hand').setAttribute('aria-pressed',raised);$('hand').querySelector('span').textContent=raised?'Lower hand':'Raise hand';$('hand-status').textContent=raised?'Hand raised. Type your question; the lecturer will address it at the checkpoint.':'';};
 function appendMessage(author,value,status,className=''){
  if(questionCount===0)$('question-list').replaceChildren();
  const item=document.createElement('article');item.className='question-item '+className;
@@ -102,6 +110,7 @@ function appendMessage(author,value,status,className=''){
  const context=document.createElement('small');context.textContent=status;
  item.append(label,text,context);$('question-list').append(item);$('question-count').textContent=++questionCount;
  $('question-list').scrollTop=$('question-list').scrollHeight;
+ return context;
 }
 function updateTimer(){
  const remaining=formatTime(Math.ceil(player.answerRemaining));
@@ -125,9 +134,11 @@ $('question-form').onsubmit=e=>{
  e.preventDefault();if(player.state==='activity'&&answerSubmitted)return;const value=$('question').value.trim();
  if(!value){$('question').setCustomValidity('Please write a message.');$('question').reportValidity();return;}
  const isAnswer=player.state==='activity';
- appendMessage('YOU',value,isAnswer?'Answer submitted · not graded':`Question queued · slide ${current+1}`);
+ const message=discussion.add(value,isAnswer?'answer':'question');
+ const node=appendMessage('YOU',value,isAnswer?'Answer submitted · awaiting checkpoint':`Queued for checkpoint · slide ${current+1}`);messageNodes.set(message.id,node);
  $('question').value='';
  if(isAnswer){answerSubmitted=true;sync();}
+ renderDiscussion();
 };
 $('question').oninput=()=>$('question').setCustomValidity('');
 sync();
@@ -141,8 +152,71 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.class
 
 $('toggle-chat').onclick=()=>{const collapsed=document.body.classList.toggle('chat-collapsed');$('toggle-chat').textContent=collapsed?'Show chat':'Hide chat';$('toggle-chat').setAttribute('aria-expanded',String(!collapsed));};
 
-$('voice-enabled').onchange=()=>{stopSpeech();voiceEnabled=$('voice-enabled').checked;player.pause();$('voice-error').hidden=true;sync();};
+$('voice-enabled').onchange=()=>{if(player.state==='discussion')return;stopSpeech();voiceEnabled=$('voice-enabled').checked;player.pause();$('voice-error').hidden=true;sync();};
 $('mute').onclick=()=>{muted=!muted;presenter.mute(muted);$('mute').setAttribute('aria-pressed',String(muted));$('mute').textContent=muted?'Unmute':'Mute';};
 
 // Named exports support integration checks without adding globals.
-export { player, presenter };
+export { player, presenter, discussion };
+
+function renderDiscussion(){
+ const active=player.state==='discussion';
+ $('voice-enabled').disabled=active;
+ $('checkpoint-panel').hidden=!active;
+ for(const message of discussion.messages){const node=messageNodes.get(message.id);if(node)node.textContent=({queued:'Queued for checkpoint',selected:'Included in current response',addressed:'Addressed',deferred:'Deferred: '+(message.reason||'For later')})[message.status];}
+ if(!active)return;
+ const labels={reviewing:'Reviewing class messages',speaking:'Addressing the class',followup:'Any follow-up questions?',closed:'Returning to the lecture'};
+ $('checkpoint-title').textContent=labels[discussion.state]||'Class discussion';
+ $('checkpoint-time').textContent=formatTime(Math.ceil(discussion.state==='followup'?discussion.idle:discussion.remaining));
+ $('checkpoint-detail').textContent=discussion.state==='followup'?`Follow-up window · ${formatTime(Math.ceil(discussion.remaining))} discussion time left`:'New questions stay queued until this response finishes.';
+ $('status').textContent=labels[discussion.state]||'Class discussion';
+ $('play').textContent='Checkpoint discussion';$('runtime-state').textContent='Lecture resumes automatically after discussion';
+ $('caption').textContent=discussion.state==='speaking'&&feedbackSegment?feedbackSegment.text:discussion.state==='reviewing'?'Let’s look at your answers and questions together.':'You can ask a follow-up question before we continue.';
+ $('question').disabled=false;$('question').placeholder='Ask a follow-up question…';$('message-label').textContent='Your follow-up';
+ const button=$('question-form').querySelector('button[type=submit]');button.disabled=false;button.textContent='Submit ↗';
+}
+function finishDiscussion(){
+ discussionRequest?.abort();discussionRequest=null;discussionEpoch++;
+ stopSpeech();feedbackSegment=null;feedbackOffset=0;feedbackItem=null;viewedSlide=null;
+ appendMessage('AI LECTURER','Let’s continue with the lesson.','Discussion closed; deferred messages remain visible.','lecturer-message');
+ player.continue();resetClock();sync();startSpeech();
+}
+function stepDiscussion(dt){
+ if(discussion.state==='closed'){finishDiscussion();return;}
+ if(discussion.state==='followup'&&discussion.pending.length){requestFeedback();return;}
+ if(discussion.state==='speaking'){
+  if(voiceEnabled&&discussion.remaining===0&&!presenter.active){stopSpeech();discussion.close('Speech preparation exceeded discussion time');return;}
+  if(voiceEnabled){if(!feedbackStarted)startFeedback();}
+  else {feedbackOffset+=dt;if(feedbackOffset>=Math.max(5,feedbackSegment.text.split(/\s+/).length/2.5))finishFeedback();}
+ }
+}
+async function requestFeedback(){
+ const batch=discussion.select();if(!batch)return;
+ const epoch=discussionEpoch;discussionRequest=new AbortController();renderDiscussion();
+ try{
+  const response=await fetch('/api/discuss',{method:'POST',headers:{'Content-Type':'application/json'},signal:discussionRequest.signal,body:JSON.stringify({messages:batch.map(({id,text,kind})=>({id,text,kind})),history:discussion.history})});
+  const result=await response.json();if(!response.ok)throw new Error(result.error||'Feedback unavailable');
+  if(epoch!==discussionEpoch||discussion.state!=='reviewing')return;
+  if(discussion.remaining<result.text.split(/\s+/).length/2.5+8){discussion.close('Not enough time to deliver feedback');return;}
+  discussion.accept(result);feedbackSegment={id:result.segmentId,text:result.text};feedbackOffset=0;feedbackStarted=false;
+  feedbackItem=appendMessage('AI LECTURER',result.text,voiceEnabled?'Preparing spoken feedback · '+result.model:'Read the feedback · '+result.model,'lecturer-message');
+  renderDiscussion();
+ }catch(error){
+  if(epoch!==discussionEpoch||discussion.state!=='reviewing')return;
+  discussion.fail('Feedback unavailable; retained for later');
+  appendMessage('SYSTEM','Feedback could not be generated. Your messages are retained for later.','Continuing after the follow-up window.');
+  renderDiscussion();
+ }
+}
+function startFeedback(){
+ if(!feedbackSegment||feedbackStarted)return;feedbackStarted=true;
+ const epoch=discussionEpoch;
+ presenter.play(feedbackSegment,feedbackOffset,{
+  onReady:()=>{if(feedbackItem)feedbackItem.textContent='Speaking feedback';},
+  onEnd:()=>{if(epoch===discussionEpoch&&player.state==='discussion')finishFeedback();},
+  onError:()=>{if(epoch!==discussionEpoch)return;feedbackStarted=false;discussion.fail('Feedback speech failed');if(feedbackItem)feedbackItem.textContent='Speech failed · messages deferred';feedbackSegment=null;renderDiscussion();}
+ });
+}
+function finishFeedback(){
+ discussion.delivered(feedbackSegment.text);feedbackStarted=false;feedbackOffset=0;feedbackSegment=null;
+ if(feedbackItem)feedbackItem.textContent='Feedback delivered';feedbackItem=null;renderDiscussion();
+}

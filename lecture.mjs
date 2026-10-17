@@ -1,6 +1,7 @@
 // Approved sample content. All times are provisional until audio is connected.
 export const lecture = {
   id: 'functions-01', version: 1,
+  discussion: {budgetSeconds:90,idleSeconds:12,reserveSeconds:20},
   slides: [
     {id:'goals', chapter:'01 / YOUR LEARNING GOALS', title:'By the end, you can…', body:'Three ideas to take with you.', html:'<div class="outcomes"><div id="goal-input"><span>01</span><p>Identify an input and its output.</p></div><div id="goal-rule"><span>02</span><p>Explain the rule connecting them.</p></div><div id="goal-predict"><span>03</span><p>Predict what happens with a new input.</p></div></div>'},
     {id:'relationship', chapter:'02 / THE BIG IDEA', title:'A function is a relationship.', body:'Give it an input. Follow a rule. Get an output.', html:'<div class="diagram"><div class="node" id="input"><small>INPUT</small>3</div><span class="arrow">→</span><div class="node function" id="rule"><small>RULE</small>× 2</div><span class="arrow">→</span><div class="node" id="output"><small>OUTPUT</small>6</div></div>'},

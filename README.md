@@ -27,7 +27,7 @@ Use **My lectures → Enter classroom → Start lecture**. Enable Lecturer voice
 - Browsing slides during the answer window changes only the viewed slide; it preserves the pending question, submission and countdown. Timeout returns to the explanation.
 - Returning to the library or hiding the browser tab pauses narration and freezes the answer timer. Focus mode retains collapsible chat.
 
-The app still has no authentication, enrollment backend, shared session authority, real online presence, or AI-generated Q&A. Sample classmates do not submit synthetic answers. Shared sessions will eventually allow advancing when all enrolled participants have answered. No microphone is required or recorded.
+The app still has no authentication, enrollment backend, shared session authority, real online presence, or shared multi-student Q&A. Sample classmates do not submit synthetic answers. Shared sessions will eventually allow advancing when all enrolled participants have answered. No microphone is required or recorded.
 
 ## Implementation
 
@@ -51,9 +51,21 @@ We stop after each part and wait for user approval.
 1. Student classroom interface — approved.
 2. Scripted lecture runtime and timed chat activity — approved.
 3. First speaking 3D presenter — functional baseline accepted for continuing. Avatar visual quality and presenter/voice selection are deferred to a later review.
-4. Grounded Q&A and assessments — predefined checkpoints, grouped responses to all pending messages, bounded follow-up windows, and automatic return to teaching. See [the interaction plan](docs/interaction-plan.md).
+4. Local checkpoint Q&A — built; awaiting review. Grouped generated feedback, message coverage, bounded follow-up windows and automatic return to teaching. See [the interaction plan](docs/interaction-plan.md).
 5. Admin studio: sources, extraction, lecture plans and scripts with approvals.
 6. Assets, HTML slide and detailed delivery generation; dependency tracking.
 7. Publishing and operation: authentication, versioned shared sessions and end-to-end validation.
 
 Later refinement: revisit avatar quality and presenter choices after the interaction flow has been validated.
+
+## Part 04: local checkpoint discussion
+
+The first discussion checkpoint follows the sample practice question. Questions and raised hands during teaching never stop the lecturer. After the 30-second answer window, all queued questions/answers are sent together to **Qwen3 14B through local Ollama**, with the approved lecture text and recent feedback as context. Kokoro speaks the response through the current avatar. The endpoint validates that every submitted message ID is either covered or explicitly deferred. Coverage is marked Addressed only after delivery finishes. This structural check is not a guarantee that the model's answer is pedagogically or factually perfect.
+
+Ollama must be running at `http://127.0.0.1:11434` with `qwen3:14b` installed. It was already available on the development machine. Other setups can use `ollama pull qwen3:14b` and start Ollama, or set `ULTRA_CHAT_MODEL` to an installed model that supports the required structured JSON output. Neither reasoning nor speech uses a cloud API.
+
+The checkpoint allows **90 seconds for discussion** after collection, with a **12-second idle follow-up window** after each response. New messages during a response are queued for the next batch. Generation has a 40-second request timeout; lack of remaining delivery time defers the batch. An already-playing short response finishes naturally rather than being cut off at the budget. Speech preparation that runs out of discussion time is cancelled locally. Empty queues, idle follow-up windows and exhausted budgets return to the saved narration segment. Deferred messages remain visible. Questions after this preview's only checkpoint are saved as deferred for later; there is no automated post-class answering yet.
+
+`discussion.mjs` owns the queue/state/budget; `feedback.mjs` validates and generates responses. `server.mjs` temporarily registers validated generated text as speech segments (20-minute IDs, bounded to 100), so the browser cannot request arbitrary TTS text. Restart clears the local session queue. Messages live in the browser; generated audio is cached on disk and can be removed by deleting `.cache/speech/`.
+
+This remains one browser, with sample classmates. Real multi-user attendance, all-students-answered detection, shared timers, admin controls and durable discussion history remain future work. Avatar quality is intentionally unchanged.

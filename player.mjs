@@ -1,6 +1,7 @@
 // Pure timeline: callers provide elapsed time; no DOM or wall-clock dependencies.
 export class LecturePlayer {
-  constructor(segments) {
+  constructor(segments,{checkpoints=false}={}) {
+    this.checkpoints=checkpoints;
     if (!segments.length || segments.some(s => !Number.isFinite(s.duration) || s.duration <= 0)) throw new Error('Segments require positive durations');
     this.segments = segments;
     this.index = 0;
@@ -20,7 +21,7 @@ export class LecturePlayer {
     this.index=index; this.offset=0; this.state='paused'; this.answerRemaining=0;
   }
   continue() {
-    if(this.state!=='activity') return;
+    if(!['activity','discussion'].includes(this.state)) return;
     if(this.index===this.segments.length-1){this.state='completed';return;}
     this.index++; this.offset=0; this.answerRemaining=0; this.state='playing';
   }
@@ -28,7 +29,7 @@ export class LecturePlayer {
     if(!Number.isFinite(seconds) || seconds<=0) return;
     if(this.state==='activity'){
       this.answerRemaining=Math.max(0,this.answerRemaining-seconds);
-      if(this.answerRemaining===0)this.continue();
+      if(this.answerRemaining===0){if(this.checkpoints)this.state='discussion';else this.continue();}
       return;
     }
     if(this.state!=='playing') return;

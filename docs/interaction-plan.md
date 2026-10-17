@@ -1,12 +1,12 @@
 # Checkpoint-based classroom interaction
 
-Status: agreed requirements for the next module; not implemented yet.
+Status: first local checkpoint implementation built; awaiting user review. Shared multi-student operation remains planned.
 
 ## Teaching and interruption policy
 
 Student questions and raised hands never interrupt an utterance or stop narration. They enter the session queue. The lecturer reaches a predefined checkpoint in the approved delivery script before handling them. Manual admin pause remains a separate control.
 
-Each checkpoint identifies its source context, resume segment, response collection window, follow-up idle timeout, and maximum discussion time. These values belong in the lecture plan and are configurable; exact defaults remain to be chosen. The UI shows students the next opportunity for questions.
+Each checkpoint identifies its source context, resume segment, response collection window, follow-up idle timeout, and maximum discussion time. These values belong in the lecture plan and are configurable; the current preview uses 30 seconds for collection, 12 seconds for idle follow-ups and a 90-second discussion budget. The UI shows students the next opportunity for questions.
 
 ## Batch discussion
 
