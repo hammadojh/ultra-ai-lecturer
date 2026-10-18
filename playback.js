@@ -1,3 +1,5 @@
+import {readAuthoringDrafts} from './annotations.mjs';
+import {presentationFingerprint,slidesReady} from './slides.mjs';
 import {imageBounds,normalizedPoint,annotationActive,annotationKey} from './annotations.mjs';
 import {Presenter} from './presenter.mjs';
 import {voiceFingerprint,voiceReady} from './voice-authoring.mjs';
@@ -38,17 +40,22 @@ function play(){
 try{
  const publishedId=new URLSearchParams(location.search).get('published');
  if(publishedId){location.replace('/?published='+encodeURIComponent(publishedId));throw Error('Opening student classroom…');}
- const drafts=JSON.parse(localStorage.getItem('ultra-authoring-v1')||'[]');draft=publishedId?await fetch('/api/published/'+encodeURIComponent(publishedId)).then(async r=>{const data=await r.json();if(!r.ok)throw Error(data.error);return data;}):drafts.find(d=>d.id===new URLSearchParams(location.search).get('lecture'));
+ const drafts=readAuthoringDrafts();draft=publishedId?await fetch('/api/published/'+encodeURIComponent(publishedId)).then(async r=>{const data=await r.json();if(!r.ok)throw Error(data.error);return data;}):drafts.find(d=>d.id===new URLSearchParams(location.search).get('lecture'));
  if(publishedId){document.title='Ultra · Lecture';document.querySelector('header a').href='/';document.querySelector('header a').textContent='← My lectures';document.querySelector('header strong').textContent='ultra · Classroom';document.querySelector('header span').textContent='Omar · Student';$('review-annotations').hidden=true;document.querySelector('aside h2').textContent='Lecture';$('checkpoint').querySelector('p').textContent='Take a moment to answer the question or review the material, then continue. Live Q&A is not connected for this lecture yet.';}
  if(!draft?.direction?.approved||!draft.voice?.approved||!voiceReady(draft)||draft.voice.input!==voiceFingerprint(draft)||!draft.script?.approved||!draft.plan?.approved||!draft.approved)throw Error('Approve the current presenter instructions and voice set in the authoring studio first.');
  const planInput=JSON.stringify({title:draft.title,brief:draft.brief,presentation:draft.presentation,ai:draft.ai||{provider:'local'},sources:draft.sources.map(({id,name,text})=>({id,name,text}))});
  const scriptInput=JSON.stringify({setup:planInput,plan:draft.plan.markdown});
- const directionInput=JSON.stringify({script:draft.script.markdown,input:draft.script.input,sourceId:draft.presentation?.sourceId,sections:draft.sources.find(s=>s.id===draft.presentation?.sourceId)?.import?.sections});
+ const directionInput=presentationFingerprint(draft);
+ if(draft.presentation?.mode!=='original'&&!slidesReady(draft))throw Error('Approve the current generated slides first.');
  if(draft.plan.input!==planInput||draft.script.input!==scriptInput||draft.direction.input!==directionInput)throw Error('Lecture content changed. Approve the updated authoring steps before playback.');
  sections=draft.direction.markdown.split(/^## /m).filter(s=>/^.+\[\d+:\d{2}[–-]\d+:\d{2}\]/.test(s));
  if(!sections.length||draft.voice.clips.some(c=>!sections[c.section-1]))throw Error('Presenter section headings changed. Regenerate instructions and voice clips.');
  $('review-annotations').href='/annotation-review.html?lecture='+encodeURIComponent(draft.id);$('title').textContent=draft.title;render();
  const source=draft.sources.find(s=>s.id===draft.presentation.sourceId);
+ if(draft.presentation?.mode!=='original'){
+  slidesLoading=true;$('play').disabled=true;render();
+  const response=await fetch('/api/render-generated-slides',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(draft)}),data=await response.json();if(!response.ok)throw Error(data.error);renderedPages=data.pages;slidesLoading=false;$('play').disabled=false;render();
+ }
  if(source?.import?.originalUrl?.endsWith('.pptx')&&!source.import.assets?.some(a=>a.kind==='page')){
   slidesLoading=true;$('play').disabled=true;render();$('notice').textContent='Rendering your original PowerPoint slides. This happens once and is cached.';
   fetch('/api/render-slides',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({originalUrl:source.import.originalUrl})}).then(async r=>{const data=await r.json();if(!r.ok)throw Error(data.error||'Slide rendering failed.');renderedPages=data.pages;slidesLoading=false;$('play').disabled=false;render();$('status').textContent='Original slides ready. Press Play.';}).catch(error=>{$('notice').textContent=error.message;$('status').textContent='Could not render the original slides. Reload to retry.';});
@@ -75,7 +82,7 @@ function drawAnnotations(){
  }
 }
 function persistAnnotations(){
- try{const all=JSON.parse(localStorage.getItem('ultra-authoring-v1')||'[]'),target=all.find(d=>d.id===draft.id);if(!target)throw Error('Lecture no longer exists.');target.annotations=draft.annotations;target.annotationGeneration=draft.annotationGeneration;localStorage.setItem('ultra-authoring-v1',JSON.stringify(all));$('annotation-status').textContent='Annotation saved.';fetch('/api/authoring-backup',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({drafts:all,selected:draft.id,savedAt:new Date().toISOString()})}).then(r=>{if(!r.ok)throw Error();}).catch(()=>{$('annotation-status').textContent='Saved in browser; local backup unavailable.';});}catch(error){$('annotation-status').textContent='Could not save: '+error.message;}
+ try{const all=readAuthoringDrafts(),target=all.find(d=>d.id===draft.id);if(!target)throw Error('Lecture no longer exists.');target.annotations=draft.annotations;target.annotationGeneration=draft.annotationGeneration;localStorage.setItem('ultra-authoring-v1',JSON.stringify(all));$('annotation-status').textContent='Annotation saved.';fetch('/api/authoring-backup',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({drafts:all,selected:draft.id,savedAt:new Date().toISOString()})}).then(r=>{if(!r.ok)throw Error();}).catch(()=>{$('annotation-status').textContent='Saved in browser; local backup unavailable.';});}catch(error){$('annotation-status').textContent='Could not save: '+error.message;}
 }
 function renderAnnotations(){
  if(!draft)return;marking=false;anchor=null;previewBox=null;$('annotation-layer').classList.remove('marking');
@@ -103,7 +110,7 @@ $('generate-ai-annotations').onclick=async()=>{
   for(const clip of draft.voice.clips){
    const section=sections[clip.section-1]||'',slide=Number(section.match(/^Original slide:\s*(\d+)/m)?.[1]),key=annotationKey(draft,clip,slide);
    if(draft.annotationGeneration?.[key]){completed++;continue;}
-   const page=renderedPages.find(a=>a.page===slide)||source.import?.assets?.find(a=>a.kind==='page'&&a.page===slide);
+   const page=renderedPages.find(a=>a.page===slide)||source?.import?.assets?.find(a=>a.kind==='page'&&a.page===slide);
    if(!page)throw Error('Original slide '+slide+' is unavailable. Render the deck first.');
    $('ai-annotation-status').textContent='AI inspecting slide '+slide+' · clip '+(completed+1)+' of '+draft.voice.clips.length+'…';
    const response=await fetch('/api/annotations',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({ai:draft.ai,text:clip.text,imageUrl:page.url,cue:section})}),data=await response.json();if(!response.ok)throw Error(data.error||'Annotation generation failed.');

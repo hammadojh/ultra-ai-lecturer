@@ -47,3 +47,111 @@
 .hand-marker{position:absolute;top:-13px;transform:translateX(-50%);display:grid;place-items:center;width:21px;height:21px;border-radius:50%;background:#2447ce;color:white;border:2px solid var(--paper);font-size:9px;font-weight:700;z-index:2}
 @media(max-width:760px){.questions{min-height:540px}.question-list{min-height:270px;max-height:420px}}
 .authored-classroom #slide-content{position:absolute;inset:0;padding:0;display:block}.authored-classroom #classroom-slide-image{width:100%;height:100%;object-fit:contain}.authored-classroom #classroom-annotations{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.authored-classroom .slide-meta,.authored-classroom .stage-bottom{display:none}.authored-classroom .floating-presenter,.authored-classroom .caption,.authored-classroom .waiting-state{z-index:3}
+
+/* Student experience: library and classroom, isolated from authoring styles. */
+.student-app{--ink:#18283f;--muted:#53647a;--line:#dce3ed;--green:#2454d8;--paper:#fff;background:#f4f6fa;font:14px/1.55 'DM Sans',system-ui,sans-serif;color:var(--ink)}
+.student-app .topbar{height:64px;padding:0 28px;background:white;gap:20px}.student-app .brand{font-size:24px}.student-app .brand-label{font-size:11px;letter-spacing:.03em}.student-app .top-nav{margin-left:auto;gap:22px}.student-app .nav-link{font-size:14px}.student-app .student{font-size:14px}.student-app .student small{font-size:12px}.student-app main{max-width:1520px;padding:28px 32px 20px}.student-app h1{font:650 28px/1.25 'DM Sans',sans-serif;letter-spacing:-.02em}.student-app button,.student-app input,.student-app textarea{font-family:inherit}.student-app :focus-visible{outline:3px solid #3264e7;outline-offset:3px}.student-app .control,.student-app .primary{min-height:42px;padding:10px 15px;font-size:14px;border-radius:7px}.student-app .primary{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;background:#2454d8;color:white;white-space:nowrap}.student-app .control{background:white;border-color:#cbd5e3}.student-app .control span{font-size:13px}.student-app .text-button{font-size:14px}.student-app button:disabled{cursor:not-allowed}.student-skip{position:fixed;top:-80px;left:16px;padding:12px;background:white;z-index:20}.student-skip:focus{top:12px}
+.student-app #library{max-width:1120px;margin:auto}.student-app .library-intro{padding:10px 0 28px}.student-app .library-intro h1{font-size:30px;margin:0 0 10px}.student-app .library-intro p{font-size:15px;margin:0}.student-app .library-heading{align-items:center;padding:0 0 16px;gap:20px}.student-app .library-heading h2{font:600 18px 'DM Sans',sans-serif}.student-app .library-heading h2 span{font-size:13px;background:#e5ecfc;border-radius:20px;padding:3px 8px;margin-left:8px}.lecture-search-label{display:grid;gap:6px;font-size:12px;color:var(--muted)}#student-search{font:14px 'DM Sans',sans-serif;padding:10px 12px;border:1px solid #bcc9db;border-radius:7px;background:white;width:260px;max-width:100%;color:var(--ink)}#student-search::placeholder{color:#596c85}.student-app .lecture-row{gap:24px;padding:24px 0;align-items:center}.student-app .lecture-row h3{font:600 20px/1.4 'DM Sans',sans-serif;letter-spacing:-.01em;margin:0 0 8px;overflow-wrap:anywhere}.student-app .lecture-row p{font-size:14px;margin:0;color:var(--muted)}#library-status,#library-empty{font-size:14px;color:var(--muted);margin:16px 0}#library-status:empty{display:none}.demo-library{margin-top:32px;padding:18px 20px;background:#fff;border:1px solid var(--line);border-radius:8px}.demo-library>summary{cursor:pointer;font-weight:600;font-size:14px}.student-app .demo-library .lecture-row{border:0;padding-bottom:0}.student-app footer{font-size:12px;letter-spacing:0;margin-top:32px;padding:18px 0;border-top:1px solid var(--line)}
+.student-app .classroom-toolbar{justify-content:flex-end;gap:8px;margin-bottom:20px}.student-app #back-library{margin-right:auto}.student-app .lecture-heading{margin:0 0 22px;gap:24px}.student-app .lecture-heading h1{margin:5px 0 7px;font-size:26px;max-width:40ch}.student-app .lecture-heading p{font-size:14px;margin:0}.student-app .lecture-heading .eyebrow{text-transform:none;font-size:12px;letter-spacing:0;color:var(--muted)}.student-app .session-status{font-size:12px;white-space:nowrap}.student-app .classroom{grid-template-columns:minmax(0,1fr) 340px;gap:22px;align-items:start}.student-app .stage-column{min-width:0}.student-app .stage{border-radius:10px;min-height:490px;box-shadow:none;background:white}.student-app.authored-classroom .stage{aspect-ratio:16/9;min-height:0;padding:0;background:#111a29}.student-app .stage.waiting{border-color:#ba850f;box-shadow:inset 0 0 0 3px #e8b43e}.student-app .slide-meta,.student-app .stage-bottom{font-size:12px}.student-app .stage>.caption{font-size:14px;line-height:1.5;max-height:30%;overflow:auto;border-radius:7px;left:16px;right:185px;bottom:16px;padding:10px 14px}.student-app .floating-presenter{width:150px;height:188px;right:16px;bottom:16px;border-radius:8px;border:0;box-shadow:none;background:#f8faff}.student-app #avatar-3d{width:150px;height:160px}.student-app .floating-presenter>span{font-size:11px}.student-app .floating-presenter small{font-size:10px}.student-app .waiting-state{top:14px;left:16px;font-size:13px}.student-app .voice-settings{font-size:13px;gap:14px;flex-wrap:wrap;padding:16px 0 0}.student-app #voice-status{font-size:12px;color:var(--muted)}.student-app .voice-settings .control{min-height:36px;font-size:13px;padding:6px 12px}.student-app .playback-actions{gap:8px;flex-wrap:wrap}.student-app #runtime-state{font-size:12px;color:var(--muted)}.student-app #elapsed{font-size:13px}.student-app .controls{padding:12px 0;gap:12px}.student-app .navigation{gap:14px}.student-app .navigation button{width:40px;height:40px;border-radius:7px}.student-app #progress{font-size:12px}.student-app .preview-note{font-size:12px;line-height:1.6;color:var(--muted);margin:4px 0}.student-app .timeline-track{padding-bottom:36px}.student-app .checkpoint-marker{font-size:11px;padding:4px 6px}.student-app .questions{height:clamp(560px,75vh,840px);min-height:0;display:flex;flex-direction:column;padding:16px;background:white;border-radius:10px}.student-app .question-list{flex:1;min-height:100px;max-height:none;overflow:auto;padding:12px 0}.student-app .people{flex-shrink:0;margin-bottom:12px}.student-app .people summary>span:nth-child(2){font-size:13px}.student-app .people li{font-size:13px}.student-app .people p{font-size:12px}.student-app .panel-title{margin:0;flex-shrink:0}.student-app .panel-title h2{font-size:17px}.student-app .panel-title>span{font-size:12px}.student-app .question-item p{font-size:14px;line-height:1.55}.student-app .question-item>small{font-size:12px}.student-app .question-item>small:first-child{font-size:12px}.student-app .empty{padding:24px 8px}.student-app .empty h3{font-size:16px}.student-app .empty p{font-size:13px;line-height:1.6}.student-app .question-glyph{display:none}.student-app .message-composer{border-radius:9px}.student-app .message-composer textarea{font-size:14px;line-height:1.5;width:100%}.student-app .message-composer textarea::placeholder{color:#596c85}.student-app .composer-icon{width:40px;height:40px}.student-app #hand-status{font-size:12px}.student-app .checkpoint-panel strong,.student-app .chat-waiting strong{font-size:13px}.student-app .checkpoint-panel p,.student-app .chat-waiting small{font-size:12px}.student-app.chat-collapsed .classroom{grid-template-columns:1fr}.student-app.chat-collapsed .questions{display:none}.student-app.focus-mode main{max-width:none;padding:14px 20px}.student-app.focus-mode .classroom{grid-template-columns:minmax(0,1fr) 340px}.student-app.focus-mode.chat-collapsed .classroom{grid-template-columns:1fr}.student-app.focus-mode .questions{height:calc(100dvh - 82px)}.student-app.focus-mode .stage{height:calc(100dvh - 270px);min-height:300px}.student-app.focus-mode .voice-settings{padding-top:8px}
+@media(max-width:1050px){.student-app .brand-label{display:none}.student-app main{padding:22px}.student-app .classroom,.student-app.focus-mode .classroom{grid-template-columns:minmax(0,1fr) 300px;gap:16px}.student-app .stage>.caption{right:140px;font-size:13px}.student-app .floating-presenter{width:110px;height:145px}.student-app #avatar-3d{width:110px;height:120px}.student-app .floating-presenter small{display:none}}
+@media(max-width:800px){.student-app .topbar{padding:0 16px;gap:14px}.student-app .top-nav{gap:14px}.student-app .top-nav a{font-size:12px}.student-app .student>span:last-child{display:none}.student-app main{padding:18px 16px}.student-app .classroom,.student-app.focus-mode .classroom{grid-template-columns:1fr}.student-app .lecture-heading h1{font-size:23px}.student-app .lecture-heading{align-items:start;gap:12px}.student-app .library-heading{align-items:start;flex-direction:column;gap:14px}.lecture-search-label,#student-search{width:100%}.student-app .lecture-row{flex-wrap:wrap;gap:16px}.student-app .lecture-row>div{flex-basis:100%}.student-app .lecture-row .primary{margin-left:0}.student-app .lecture-row h3{font-size:19px}.student-app .classroom-toolbar{flex-wrap:wrap}.student-app .stage{min-height:580px;padding-bottom:240px}.student-app.authored-classroom .stage{min-height:270px;aspect-ratio:16/10}.student-app .stage>.caption{right:12px;left:12px;bottom:12px;font-size:13px;max-height:30%;}.student-app .floating-presenter{bottom:auto;top:12px;right:12px;width:80px;height:105px}.student-app #avatar-3d{width:80px;height:85px}.student-app .floating-presenter>span{font-size:9px;bottom:3px}.student-app .stage #slide-content{padding-right:0}.student-app .questions,.student-app.focus-mode .questions{height:520px;min-height:0;max-height:none}.student-app.focus-mode .stage{height:auto;min-height:440px}.student-app.authored-classroom.focus-mode .stage{height:auto;min-height:270px}.student-app .waiting-state{right:104px;left:12px;top:12px;flex-wrap:wrap;gap:4px;font-size:12px}.student-app #answer-timer{font-size:17px}.student-app #elapsed{margin-left:auto}.student-app .voice-settings{gap:10px}.student-app #voice-status{flex-basis:100%}.student-app .playback-actions #runtime-state{order:3;flex-basis:100%}.student-app .library-intro h1{font-size:27px}}
+.student-app .timeline-track{padding-bottom:36px}.student-app .floating-presenter>span{bottom:0;left:0;right:0;background:#f8faff;padding:3px 0;line-height:1.3}.student-app .floating-presenter small{margin-top:2px}.student-app .floating-presenter #avatar-3d{flex-shrink:0}.student-app .stage>.caption{scrollbar-width:thin}.student-app.focus-mode .stage{height:calc(100dvh - 300px)}@media(max-width:800px){.student-app.focus-mode .stage{height:auto}.student-app .floating-presenter>span{padding:2px 0}}
+
+/* Fill the focus column; the slide image itself preserves its proportions. */
+.student-app.focus-mode .stage{width:100%;max-width:none;aspect-ratio:auto}
+.student-app.focus-mode .classroom{gap:14px}
+.student-app.focus-mode .stage-column{width:100%;min-width:0}
+
+/* Compact classroom heading and canvas-level focus control. */
+.student-app #back-library,.student-app .lecture-heading .eyebrow,.student-app .lecture-heading p,.student-app .session-status{display:none}
+.student-app:not(.focus-mode) .classroom-toolbar{display:none}
+.student-app .lecture-heading{margin:0 0 16px}
+.student-app .lecture-heading h1{margin:0;font-size:24px}
+.student-app #lecture-breadcrumb{max-width:38ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--muted)}
+.student-app #lecture-breadcrumb::before{content:'/';margin-right:18px;color:var(--muted)}
+.student-app .stage>.canvas-focus{position:absolute;top:12px;right:12px;z-index:8;display:grid;place-items:center;width:40px;height:40px;min-height:40px;padding:9px;background:#ffffffed;color:#18283f;border:1px solid #cbd5e3;border-radius:7px}
+.student-app .canvas-focus svg{width:20px;height:20px}
+.student-app.focus-mode .classroom-toolbar{margin-bottom:10px}
+@media(max-width:800px){.student-app #lecture-breadcrumb{max-width:22ch;font-size:12px}.student-app .top-nav{gap:8px}.student-app #lecture-breadcrumb::before{margin-right:8px}.student-app .floating-presenter{top:62px}.student-app .lecture-heading h1{font-size:21px}}
+
+/* Focus layout: full-width canvas, then controls and chat side by side. */
+@media(min-width:801px){
+ .student-app.focus-mode .classroom{grid-template-columns:minmax(0,1fr) 340px;align-items:start;column-gap:20px;row-gap:12px}
+ .student-app.focus-mode .stage-column{display:contents}
+ .student-app.focus-mode .stage{grid-column:1/-1;grid-row:1;width:100%;height:calc(100dvh - 340px);min-height:300px}
+ .student-app.focus-mode .voice-settings{grid-column:1;grid-row:2;margin:0;padding:0}
+ .student-app.focus-mode #voice-error{grid-column:1;grid-row:3;margin:0}
+ .student-app.focus-mode .playback{grid-column:1;grid-row:4;padding:0}
+ .student-app.focus-mode .controls{grid-column:1;grid-row:5;margin:0;padding:0}
+ .student-app.focus-mode .questions{grid-column:2;grid-row:2/6;height:250px;min-height:0;max-height:none}
+ .student-app.focus-mode .question-list{min-height:40px}
+ .student-app.focus-mode .people{margin-bottom:6px;padding-bottom:6px}
+ .student-app.focus-mode .question-list .empty{padding:8px 4px}
+ .student-app.focus-mode .question-list .empty h3{margin:4px 0}
+ .student-app.focus-mode .question-list .empty p{margin:4px 0}
+ .student-app.focus-mode.chat-collapsed .classroom{grid-template-columns:1fr}
+ .student-app.focus-mode.chat-collapsed .stage{height:calc(100dvh - 290px)}
+}
+
+/* Compact chat header and single-line composer in every classroom layout. */
+.student-app .chat-header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.student-app .chat-header .panel-title{display:flex;align-items:center;gap:8px;margin:0;min-width:0}
+.student-app .chat-header .panel-title h2{white-space:nowrap;font-size:16px}
+.student-app .chat-header .people,.student-app.focus-mode .chat-header .people{position:relative;margin:0;padding:0;border:0}
+.student-app .chat-header .people summary{gap:6px;white-space:nowrap}
+.student-app .chat-header .people-stack{display:none}
+.student-app .chat-header .people[open] ul{position:absolute;right:0;top:28px;z-index:9;width:220px;padding:12px;background:white;border:1px solid var(--line);border-radius:7px;max-height:160px;overflow:auto;margin:0}
+.student-app .chat-header .people p{display:none}
+.student-app .message-composer{display:flex;align-items:center;gap:6px;padding:5px 6px 5px 12px;min-height:48px;flex-shrink:0}
+.student-app .message-composer #question{flex:1;min-width:0;width:0;height:36px;min-height:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;outline:none;font:14px/1.4 'DM Sans',sans-serif;color:var(--ink)}
+.student-app .message-composer #question::placeholder{color:#596c85}
+.student-app .message-composer .composer-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:0;flex-shrink:0}
+.student-app .message-composer .composer-icon{width:34px;height:34px;min-height:34px}
+.student-app .questions #question-form{margin:0;flex-shrink:0}
+.student-app .question-list{overflow:auto;min-height:0}
+.student-app.focus-mode .question-list{min-height:0}
+.student-app .classroom-toolbar,.student-app.focus-mode .classroom-toolbar{display:none;margin:0}
+
+/* A single playback toolbar with secondary actions in a disclosure. */
+.student-app .player-panel{min-width:0;padding-top:12px}
+.student-app .player-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.student-app .player-bar #elapsed{margin-left:auto;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
+.student-app .player-bar .navigation{display:flex;align-items:center;gap:10px;margin-left:8px}
+.student-app .player-bar .navigation button{background:white;border:1px solid var(--line);color:var(--ink);width:36px;height:36px}
+.student-app .player-bar .navigation button:disabled{opacity:.4}
+.student-app .player-bar .control,.student-app .player-bar .primary{min-height:38px;padding:8px 12px;font-size:13px}
+.student-app .playback-options{position:relative;flex-shrink:0}
+.student-app .playback-options>summary{display:grid;place-items:center;list-style:none;width:36px;height:38px;cursor:pointer;font-size:24px;border-radius:7px;border:1px solid var(--line);background:white}
+.student-app .playback-options>summary::-webkit-details-marker{display:none}
+.student-app .playback-options>div{position:absolute;right:0;bottom:46px;z-index:10;background:white;border:1px solid var(--line);border-radius:8px;padding:12px;width:200px;display:grid;gap:12px}
+.student-app .playback-options label{display:flex;align-items:center;gap:8px;font-size:13px}
+.student-app.focus-mode .player-panel{grid-column:1;grid-row:2/6;align-self:start;padding-top:0}
+.student-app .preview-note{display:none}
+@media(max-width:800px){.student-app.focus-mode .player-panel{grid-column:auto;grid-row:auto}.student-app .player-bar #elapsed{font-size:12px}.student-app .player-bar .navigation{margin-left:0}}
+
+.student-app #play,.student-app #mute{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.student-app #play::before,.student-app #mute::before{content:'';display:block;flex-shrink:0;width:17px;height:17px;background:currentColor;mask:center/contain no-repeat;-webkit-mask:center/contain no-repeat}
+.student-app #play::before{mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 4v16l13-8z'/%3E%3C/svg%3E")}
+.student-app #play[data-playing=true]::before{mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 4h4v16H6zm8 0h4v16h-4z'/%3E%3C/svg%3E")}
+.student-app #mute::before{mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 9h4l5-4v14l-5-4H3z'/%3E%3Cpath d='M15 8q4 4 0 8m3-11q7 7 0 14' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E")}
+.student-app #mute[aria-pressed=true]::before{mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 9h4l5-4v14l-5-4H3z'/%3E%3Cpath d='m16 9 5 6m0-6-5 6' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E")}
+
+/* Match the rehearsal presenter: transparent character directly on the slide. */
+.student-app .floating-presenter{right:0;bottom:0;top:auto;width:24%;height:52%;padding:0;background:transparent;border:0;border-radius:0;box-shadow:none;pointer-events:none}
+.student-app .floating-presenter #avatar-3d{width:100%;height:100%;background:transparent}
+.student-app .floating-presenter>span{display:none}
+.student-app .stage>.caption{right:25%}
+@media(max-width:800px){.student-app .stage>.caption{right:25%;font-size:12px}}
+
+.student-app .stage>.caption{background:transparent;border:0;box-shadow:none;padding:10px 16px;margin:0;min-height:0;line-height:1.6;color:white;text-shadow:0 1px 3px #000,0 0 5px #000;overflow-wrap:anywhere}
+.student-app .stage>.caption:empty{display:none}
+
+/* Half-transparent glass captions with incremental word reveals. */
+.student-app .stage>.caption{background:rgba(18,31,53,.5);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.18);border-radius:9px;padding:12px 16px;min-height:3.2em;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.student-app .caption-word{animation:caption-reveal .18s ease-out both}
+@keyframes caption-reveal{from{opacity:0}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.student-app .caption-word{animation:none}}
+
+.student-app .player-bar .navigation button{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;min-width:36px;min-height:36px;padding:0;line-height:1;font-size:22px;flex-shrink:0}
+.student-app .player-bar .navigation{gap:10px}
+.student-app .player-bar .navigation #progress{min-width:56px;text-align:center;white-space:nowrap}

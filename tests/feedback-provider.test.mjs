@@ -1,0 +1,23 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {generateFeedback} from '../feedback.mjs';
+const batch=[{id:'m1',kind:'answer',text:'14'}];
+test('live feedback uses ChatGPT with grounded instructions, history and truthful metadata',async()=>{
+ const signal=new AbortController().signal;
+ const result=await generateFeedback(batch,['Earlier reply'],signal,'question',null,async request=>{
+  assert.equal(request.model,process.env.ULTRA_CHATGPT_MODEL||'gpt-6.1-sol');
+  assert.equal(request.signal,signal);
+  assert.match(request.instructions,/APPROVED MATERIAL:/);
+  assert.match(request.instructions,/Omar/);
+  assert.deepEqual(JSON.parse(request.input),{previousLecturerReplies:['Earlier reply'],pendingMessages:batch});
+  return JSON.stringify({text:'Omar, fourteen is correct: seven times two is fourteen.',addressedIds:['m1'],deferredIds:[]});
+ });
+ assert.equal(result.provider,'chatgpt');
+ assert.equal(result.model,process.env.ULTRA_CHATGPT_MODEL||'gpt-6.1-sol');
+});
+test('ChatGPT failures propagate without a silent local fallback',async()=>{
+ await assert.rejects(generateFeedback(batch,[],undefined,'question',null,async()=>{throw Error('Reconnect ChatGPT');}),/Reconnect ChatGPT/);
+});
+test('ChatGPT output still requires complete message coverage',async()=>{
+ await assert.rejects(generateFeedback(batch,[],undefined,'question',null,async()=>JSON.stringify({text:'Omar, correct.',addressedIds:[],deferredIds:[]})),/Invalid message coverage/);
+});

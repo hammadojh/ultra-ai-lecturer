@@ -45,7 +45,7 @@ export class Presenter {
           data[values].push(clip[values][i]);data[times].push(start);data[durations].push(end-start);
         }
       }
-      this.active={id:segment.id,start:this.head.audioCtx.currentTime,offset,duration:clip.audio.duration};
+      this.active={id:segment.id,start:this.head.audioCtx.currentTime,offset,duration:clip.audio.duration,words:clip.words,wtimes:clip.wtimes};
       this.head.speakAudio(data,{isRaw:true});
       this.head.speakMarker(()=>{if(token!==this.token)return;this.active=null;this.onStatus('Ready');onEnd();});
       this.onStatus(clip.cached?'Speaking · cached voice':'Speaking · local voice');

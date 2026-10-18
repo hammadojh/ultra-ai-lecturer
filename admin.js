@@ -1,4 +1,9 @@
+import {readAuthoringDrafts} from './annotations.mjs';
+import {presentationFingerprint,slidesFingerprint,slidesReady,approvedVisuals,deckHTML} from './slides.mjs';
+let slidesJob=null;
+import {startNotificationTask} from './notifications.mjs';
 import {narrationClips,voiceFingerprint,voiceReady} from './voice-authoring.mjs';
+const visualJobs=new Map();
 let voiceJob=null;
 let directionJob=null;
 import {sourceAssets,assetFingerprint,assetsReady} from './assets-client.mjs';
@@ -7,7 +12,7 @@ let scriptJob=null;
 let openrouterConnection={connected:false},openrouterModels=[];
 const $=id=>document.getElementById(id),key='ultra-authoring-v1';
 let drafts=[],selected=null,importMetadata=null,importToken=0,editingSource=null,undoState=null,planJob=null,chatgptConnection={connected:false,enabled:false},chatgptModels=[];
-try{drafts=JSON.parse(localStorage.getItem(key)||'[]');if(!Array.isArray(drafts))throw Error();selected=drafts.find(d=>d.id===localStorage.getItem(key+'-selected'))?.id||drafts[0]?.id;}catch{$('studio-status').textContent='Saved drafts could not be read. Export any open work before clearing browser storage.';drafts=[];}
+try{drafts=readAuthoringDrafts();if(!Array.isArray(drafts))throw Error();selected=drafts.find(d=>d.id===localStorage.getItem(key+'-selected'))?.id||drafts[0]?.id;}catch{$('studio-status').textContent='Saved drafts could not be read. Export any open work before clearing browser storage.';drafts=[];}
 const current=()=>drafts.find(d=>d.id===selected);
 let backupTimer,backupQueue=Promise.resolve();
 function backupSnapshot(){return JSON.stringify({drafts,selected,savedAt:new Date().toISOString()});}
@@ -98,7 +103,7 @@ function showAssets(container,assets){
 }
 function validDetails(d){return !!(d.sources.length&&d.title.trim()&&d.brief?.audience?.trim()&&d.brief?.goals?.trim()&&d.brief.duration>=5&&d.brief.duration<=180);}
 function go(step){
- const d=current();if(step>2&&!d.sources.length)return;if(step>3&&!validDetails(d))return;
+ const d=current();if(step!==2&&(editingSource||$('source-text').value.trim()||$('source-file').disabled)){$('studio-status').textContent='Save or cancel the source edit before changing steps.';return;}if(step>2&&!d.sources.length)return;if(step>3&&!validDetails(d))return;
  d.wizardStep=step;d.furthestStep=Math.max(d.furthestStep||2,step);save();render();$('step-title').focus();
 }
 function planFingerprint(d){return JSON.stringify({title:d.title,brief:d.brief,presentation:d.presentation,ai:d.ai||{provider:'local'},sources:d.sources.map(({id,name,text})=>({id,name,text}))});}
@@ -115,15 +120,15 @@ function renderPlan(){
 }
 function renderWorkflow(){
  const d=current();if(!d)return;
- renderPlan();renderScript();renderAssets();renderDirection();renderVoice();
+ renderPlan();renderScript();renderAssets();renderSlides();renderDirection();renderVoice();
  if(d.presentation?.mode==='original'&&d.wizardStep===7){d.wizardStep=8;save();}
- if(d.presentation?.mode!=='original'&&d.wizardStep===8){d.wizardStep=7;save();}
+ if(d.presentation?.mode!=='original'&&d.wizardStep===8&&!slidesReady(d)){d.wizardStep=10;save();}
  const step=d.wizardStep||2;
- $('source-stage').hidden=step!==2;$('details-stage').hidden=step!==3;$('review-stage').hidden=step!==4;$('ready-stage').hidden=step!==5;$('script-stage').hidden=step!==6;$('assets-stage').hidden=step!==7;$('original-ready-stage').hidden=step!==8;$('voice-stage').hidden=step!==9;
+ $('slides-stage').hidden=step!==10;$('source-stage').hidden=step!==2;$('details-stage').hidden=step!==3;$('review-stage').hidden=step!==4;$('ready-stage').hidden=step!==5;$('script-stage').hidden=step!==6;$('assets-stage').hidden=step!==7;$('original-ready-stage').hidden=step!==8;$('voice-stage').hidden=step!==9;
  $('original-ready-status').textContent=scriptReady(d)?'Script approved. Ready for detailed presentation instructions.':'Return to the script and approve its current version first.';
- const titles={9:'Prepare the lecturer voice.',8:'Direct the AI presenter.',7:'Prepare your lecture visuals.',2:'Upload your material.',3:'Fill in the lecture details.',4:'Review your lecture.',6:'Write the presentation script.',5:'Build your lecture plan.'};
- const descriptions={9:'Listen to each narration clip, review it, then approve the voice set.',8:'Keep the original deck and build the presenter instructions around it.',7:'Match each script requirement to a source visual or upload, then review and approve.',2:'Add one or more sources. Text and visuals are extracted automatically.',3:'We filled in starting defaults. Adjust them to suit your students.',4:'Check the material and details, then confirm to move on.',6:'Review the timing, exact narration, slide content and presenter actions before approving.',5:'Generate from your confirmed material, review the plan, then approve it.'};
- $('step-kicker').textContent=step>=5?'AUTHORING · '+(step===5?'LECTURE PLAN':step===6?'PRESENTATION SCRIPT':step===8?'PRESENTER INSTRUCTIONS':step===9?'VOICE':'ASSETS'):'STEP '+step+' OF 4';
+ const titles={10:'Create your lecture slides.',9:'Prepare the lecturer voice.',8:'Direct the AI presenter.',7:'Prepare your lecture visuals.',2:'Upload your material.',3:'Fill in the lecture details.',4:'Review your lecture.',6:'Write the presentation script.',5:'Build your lecture plan.'};
+ const descriptions={10:'Generate from your approved script and visuals. Review and edit each slide before approving.',9:'Sample the narration, then approve the voice set. Individual clip reviews are optional.',8:'Add timing, delivery and pointing cues to your approved slides.',7:'Approve the asset plan, then create diagrams or find images and review each visual.',2:'Add one or more sources. Text and visuals are extracted automatically.',3:'We filled in starting defaults. Adjust them to suit your students.',4:'Check the material and details, then confirm to move on.',6:'Review the timing, exact narration, slide content and presenter actions before approving.',5:'Generate from your confirmed material, review the plan, then approve it.'};
+ $('step-kicker').textContent=step>=5?'AUTHORING · '+(step===10?'HTML SLIDES':step===5?'LECTURE PLAN':step===6?'PRESENTATION SCRIPT':step===8?'PRESENTER INSTRUCTIONS':step===9?'VOICE':'ASSETS'):'Lecture setup';
  $('step-title').textContent=titles[step];$('step-description').textContent=descriptions[step];
  document.querySelectorAll('.wizard-steps li').forEach((li,i)=>{li.classList.toggle('complete',i+1<step);if(i+1===Math.min(step,4))li.setAttribute('aria-current','step');else li.removeAttribute('aria-current');});
  document.querySelectorAll('[data-step]').forEach(b=>b.disabled=Number(b.dataset.step)>Math.max(d.furthestStep||step,step)||Number(b.dataset.step)>2&&!d.sources.length||Number(b.dataset.step)>3&&!validDetails(d));
@@ -165,14 +170,15 @@ $('undo-delete').onclick=()=>{if(!undoState)return;if(undoState.kind==='lecture'
 $('generate-plan').onclick=async()=>{
  const d=current();if(!d.approved||planJob||scriptJob)return;
  const input=planFingerprint(d),controller=new AbortController();planJob={id:d.id,controller};renderPlan();
+ const notify=startNotificationTask('Lecture plan');
  try{
   const response=await fetch('/api/plan',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({...JSON.parse(input),approved:d.approved})});
   const result=await response.json();if(!response.ok)throw Error(result.error||'Plan generation failed.');
   if(controller.signal.aborted)return;
   if(!drafts.includes(d)||planFingerprint(d)!==input||!d.approved)throw Error('Setup changed while generating. Confirm it and generate again.');
-  d.plan={...result,input,approved:null};save();planJob=null;
+  d.plan={...result,input,approved:null};save();notify();planJob=null;
   if(current())renderPlan();
- }catch(error){planJob=null;if(current()?.id===d.id){renderPlan();$('generation-status').textContent=error.name==='AbortError'?'Generation cancelled. Your existing plan is unchanged.':error.message;}else if(current())renderPlan();}
+ }catch(error){notify(error);planJob=null;if(current()?.id===d.id){renderPlan();$('generation-status').textContent=error.name==='AbortError'?'Generation cancelled. Your existing plan is unchanged.':error.message;}else if(current())renderPlan();}
 };
 $('cancel-plan').onclick=()=>planJob?.controller.abort();scriptJob?.controller.abort();
 $('plan-markdown').oninput=()=>{const d=current();d.plan.markdown=$('plan-markdown').value;d.plan.approved=null;save();$('approve-plan').disabled=!d.approved||d.plan.input!==planFingerprint(d)||!d.plan.markdown.trim();$('plan-approval').textContent='Edited · approval required';};
@@ -262,13 +268,14 @@ $('back-plan').onclick=()=>go(5);
 $('generate-script').onclick=async()=>{
  const d=current();if(!planReady(d)||scriptJob||planJob)return;
  const input=scriptFingerprint(d),controller=new AbortController();scriptJob={id:d.id,controller};renderScript();
+ const notify=startNotificationTask('Presentation script');
  try{
   const response=await fetch('/api/script',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({...JSON.parse(planFingerprint(d)),approved:d.approved,plan:d.plan})});
   const result=await response.json();if(!response.ok)throw Error(result.error||'Script generation failed.');
   if(controller.signal.aborted)return;
   if(!drafts.includes(d)||scriptFingerprint(d)!==input||!planReady(d))throw Error('The plan changed during generation. Approve it and try again.');
-  d.script={...result,input,approved:null};save();
- }catch(error){if(current()?.id===d.id){scriptJob=null;renderScript();$('script-status').textContent=error.name==='AbortError'?'Cancelled. Your existing script is unchanged.':error.message;return;}}
+  d.script={...result,input,approved:null};save();notify();
+ }catch(error){notify(error);if(current()?.id===d.id){scriptJob=null;renderScript();$('script-status').textContent=error.name==='AbortError'?'Cancelled. Your existing script is unchanged.':error.message;return;}}
  finally{scriptJob=null;}
  if(current())renderScript();
 };
@@ -278,16 +285,29 @@ $('approve-script').onclick=()=>{const d=current();if(!planReady(d)||scriptJob||
 $('download-script').onclick=()=>{const url=URL.createObjectURL(new Blob([current().script.markdown],{type:'text/markdown'})),a=document.createElement('a');a.href=url;a.download='presentation-script.md';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 
 function scriptReady(d){return planReady(d)&&!!d.script?.approved&&d.script.input===scriptFingerprint(d);}
+async function createVisual(d,item,mode){
+ if(visualJobs.has(item))return;
+ const controller=new AbortController(),brief=item.brief;visualJobs.set(item,controller);item.productionError=null;renderAssets();
+ const notify=startNotificationTask(mode==='find'?'Image search':'Visual generation');
+ try{const r=await fetch('/api/asset-production',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({ai:d.ai,item:{title:item.title,brief:item.brief,purpose:item.purpose},mode})});const data=await r.json();if(!r.ok)throw Error(data.error||'Could not prepare this visual.');if(!drafts.includes(d)||!d.assets.items.includes(item)||brief!==item.brief)throw Error('The brief changed. Retry with the updated plan.');item.candidates=data.candidates;item.searchQuery=data.query;item.productionError=data.candidates.length?'':'No matching images found. Edit the brief, generate a diagram, or upload an image.';save();notify();}
+ catch(e){if(e.name!=='AbortError'){item.productionError=e.message;notify(e);}save();}
+ finally{visualJobs.delete(item);if(current()?.id===d.id)renderAssets();}
+}
 function renderAssets(){
  const d=current();if(!d)return;const valid=scriptReady(d),stale=d.assets&&d.assets.input!==assetFingerprint(d),busy=assetJob?.id===d.id;
  $('generate-assets').disabled=!valid||!!assetJob||!!scriptJob||!!planJob;$('cancel-assets').hidden=!busy;
- $('assets-status').textContent=busy?'Thinking… matching visual requirements to source material.':!valid?'Approve the current script first.':stale?'The script or source visuals changed. Prepare the checklist again.':d.assets?'Review every requirement. Upload a visual, select a source, or explicitly choose a text-only treatment.':'Prepare a checklist from your approved script.';
+ $('assets-status').textContent=busy?'Thinking… matching visual requirements to source material.':!valid?'Approve the current script first.':stale?'The script or source visuals changed. Prepare the checklist again.':d.assets?(d.assets.planApproved?'Create or find visuals below, then confirm each selection.':'Review and edit the briefs, then approve the plan to continue.'):'Prepare a checklist from your approved script.';
+ const production=!!d.assets?.planApproved;
+ const phase=$('asset-phase-controls');phase.replaceChildren();
+ if(d.assets&&!stale){const heading=document.createElement('h3');heading.textContent=production?'2. Create & find assets':'1. Review the asset plan';const action=document.createElement('button');action.className='primary';action.textContent=production?'Back to asset plan':'Approve plan → Create & find assets';action.disabled=busy||!valid||visualJobs.size>0||d.assets.items.some(i=>!i.brief.trim());action.onclick=()=>{d.assets.planApproved=production?null:new Date().toISOString();save();renderAssets();};phase.append(heading,action);}
+ $('asset-production-progress').textContent=production?`${d.assets.items.filter(i=>i.status==='reviewed').length} of ${d.assets.items.length} visuals reviewed · ${visualJobs.size} processing`:'';
+ $('approve-assets').hidden=!production;$('download-assets').hidden=!production;
  const available=sourceAssets(d);showAssets($('source-visuals'),available);$('asset-checklist').replaceChildren();
  for(const item of d.assets?.items||[]){
   const card=document.createElement('article');card.className='asset-review-card';
   const title=document.createElement('h4');title.textContent=item.title;
   const context=document.createElement('p');context.textContent=item.scriptLocation+' · '+item.purpose;
-  const brief=document.createElement('textarea');brief.value=item.brief;brief.setAttribute('aria-label','Visual brief: '+item.title);brief.rows=3;brief.oninput=()=>{item.brief=brief.value;item.status='pending';d.assets.approved=null;save();$('approve-assets').disabled=true;};brief.onchange=()=>renderAssets();
+  const brief=document.createElement('textarea');brief.value=item.brief;brief.setAttribute('aria-label','Visual brief: '+item.title);brief.rows=3;brief.disabled=production;brief.oninput=()=>{item.brief=brief.value;item.status='pending';d.assets.approved=null;save();$('approve-assets').disabled=true;};brief.onchange=()=>renderAssets();
   const label=document.createElement('label');label.textContent='Visual for '+item.title;
   const select=document.createElement('select');select.setAttribute('aria-label',label.textContent);
   for(const a of [{id:'',label:'Choose a source visual or upload'},{id:'text-only',label:'Use text only — no visual needed'},...available.map(a=>({id:a.id,label:a.sourceName+' · '+a.label}))]){const o=document.createElement('option');o.value=a.id;o.textContent=a.label;select.append(o);}
@@ -298,39 +318,51 @@ function renderAssets(){
    const reader=new FileReader();reader.onload=()=>{if(!drafts.includes(d))return;item.upload={name:file.name,url:reader.result};item.assetId='upload';item.status='pending';d.assets.approved=null;save();renderAssets();};reader.readAsDataURL(file);
   };
   const chosen=item.assetId==='upload'?item.upload:available.find(a=>a.id===item.assetId);
-  const approve=document.createElement('button');approve.className='control';approve.textContent=item.status==='reviewed'?'✓ Reviewed':'Confirm this visual';approve.disabled=busy||stale||!valid||!item.brief.trim()||(!chosen&&item.assetId!=='text-only');approve.onclick=()=>{item.status='reviewed';d.assets.approved=null;save();renderAssets();};
-  card.append(title,context,brief,label,select,upload);if(chosen){const img=document.createElement('img');img.src=chosen.url;img.alt=item.title;img.className='asset-preview';card.append(img);}card.append(approve);$('asset-checklist').append(card);
+  const approve=document.createElement('button');approve.className='control';approve.textContent=item.status==='reviewed'?'✓ Reviewed':'Confirm this visual';approve.disabled=visualJobs.has(item)||busy||stale||!valid||!item.brief.trim()||(!chosen&&item.assetId!=='text-only');approve.onclick=()=>{item.status='reviewed';d.assets.approved=null;save();renderAssets();};
+  card.append(title,context,brief);
+  if(!production){$('asset-checklist').append(card);continue;}
+  const actions=document.createElement('div');actions.className='plan-actions';
+  for(const [mode,text] of [['generate','Generate AI diagram'],['find','Find images with AI']]){const b=document.createElement('button');b.className='control';b.textContent=text;b.disabled=visualJobs.has(item)||stale||!valid;b.onclick=()=>createVisual(d,item,mode);actions.append(b);}
+  const state=document.createElement('p');state.setAttribute('role','status');state.textContent=visualJobs.has(item)?'Working… your result will be saved here.':item.productionError|| (item.status==='reviewed'?'Reviewed':chosen?'Visual selected · review below':'Choose how to create this visual.');
+  if(visualJobs.has(item)){const cancel=document.createElement('button');cancel.className='control';cancel.textContent='Cancel';cancel.onclick=()=>visualJobs.get(item)?.abort();actions.append(cancel);}
+  card.append(actions,state);
+  const candidates=document.createElement('div');candidates.className='asset-candidates';
+  for(const candidate of item.candidates||[]){const option=document.createElement('article');const image=document.createElement('img');image.src=candidate.url;image.alt=candidate.description||candidate.name;image.loading='lazy';const caption=document.createElement('p');caption.textContent=[candidate.name,candidate.provenance,candidate.credit,candidate.license].filter(Boolean).join(' · ');const use=document.createElement('button');use.className='control';use.textContent='Use this visual';use.onclick=()=>{item.upload={...candidate};item.assetId='upload';item.status='pending';d.assets.approved=null;save();renderAssets();};option.append(image,caption);if(candidate.sourceUrl){const source=document.createElement('a');source.href=candidate.sourceUrl;source.target='_blank';source.rel='noopener noreferrer';source.textContent='View source & license ↗';option.append(source);}option.append(use);candidates.append(option);}
+  card.append(candidates,label,select,upload);if(chosen){const img=document.createElement('img');img.src=chosen.url;img.alt=item.title;img.className='asset-preview';card.append(img);}card.append(approve);$('asset-checklist').append(card);
  }
  if(d.assets&&!d.assets.items.length){const p=document.createElement('p');p.textContent='No separate visuals were requested. Review the script before approving a text-only asset set.';$('asset-checklist').append(p);}
- $('approve-assets').disabled=!valid||busy||!assetsReady(d)||!!d.assets?.approved;$('download-assets').disabled=!d.assets;
+ $('approve-assets').disabled=visualJobs.size>0||!valid||busy||!assetsReady(d)||!!d.assets?.approved;$('download-assets').disabled=!d.assets;
+ $('next-slides').hidden=!(valid&&assetsReady(d)&&d.assets?.approved);
  $('assets-approval').textContent=valid&&assetsReady(d)&&d.assets.approved?'Asset set approved. Ready for HTML slides.':'';
 }
 $('next-assets').onclick=()=>{if(scriptReady(current()))go(current().presentation?.mode==='original'?8:7);};$('back-script').onclick=()=>go(6);
 $('generate-assets').onclick=async()=>{
  const d=current();if(!scriptReady(d)||assetJob||d.presentation?.mode==='original')return;const input=assetFingerprint(d),controller=new AbortController();assetJob={id:d.id,controller};renderAssets();
- try{const response=await fetch('/api/assets',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({title:d.title,brief:d.brief,presentation:d.presentation,ai:d.ai,approved:d.approved,sources:d.sources,plan:d.plan,script:d.script})}),result=await response.json();if(!response.ok)throw Error(result.error||'Asset preparation failed.');if(!drafts.includes(d)||input!==assetFingerprint(d)||!scriptReady(d))throw Error('The script changed. Prepare the checklist again.');d.assets={...result,input,approved:null};save();assetJob=null;renderAssets();}
- catch(error){assetJob=null;if(current()?.id===d.id){renderAssets();$('assets-status').textContent=error.name==='AbortError'?'Cancelled. Your previous checklist is unchanged.':error.message;}}
+ const notify=startNotificationTask('Asset preparation');
+ try{const response=await fetch('/api/assets',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({title:d.title,brief:d.brief,presentation:d.presentation,ai:d.ai,approved:d.approved,sources:d.sources,plan:d.plan,script:d.script})}),result=await response.json();if(!response.ok)throw Error(result.error||'Asset preparation failed.');if(!drafts.includes(d)||input!==assetFingerprint(d)||!scriptReady(d))throw Error('The script changed. Prepare the checklist again.');d.assets={...result,input,approved:null};save();notify();assetJob=null;renderAssets();}
+ catch(error){notify(error);assetJob=null;if(current()?.id===d.id){renderAssets();$('assets-status').textContent=error.name==='AbortError'?'Cancelled. Your previous checklist is unchanged.':error.message;}}
 };
 $('cancel-assets').onclick=()=>assetJob?.controller.abort();
 $('approve-assets').onclick=()=>{const d=current();if(!scriptReady(d)||!assetsReady(d)||assetJob)return;d.assets.approved=new Date().toISOString();save();renderAssets();};
 $('download-assets').onclick=()=>{const d=current(),available=sourceAssets(d);const manifest={title:d.title,...d.assets,items:d.assets.items.map(item=>({...item,visual:item.assetId==='upload'?item.upload:available.find(a=>a.id===item.assetId)||null}))};const url=URL.createObjectURL(new Blob([JSON.stringify(manifest,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='lecture-assets.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 
-$('original-back-script').onclick=()=>go(6);
+$('original-back-script').onclick=()=>go(current().presentation?.mode==='original'?6:10);
 
-function directionFingerprint(d){return JSON.stringify({script:d.script?.markdown,input:d.script?.input,sourceId:d.presentation?.sourceId,sections:d.sources?.find(s=>s.id===d.presentation?.sourceId)?.import?.sections});}
+function directionFingerprint(d){return presentationFingerprint(d);}
 function renderDirection(){
- const d=current();if(!d)return;const busy=directionJob?.id===d.id,valid=scriptReady(d)&&d.presentation?.mode==='original',stale=d.direction&&d.direction.input!==directionFingerprint(d);
+ const d=current();if(!d)return;const busy=directionJob?.id===d.id,valid=scriptReady(d)&&(d.presentation?.mode==='original'||slidesReady(d)),stale=d.direction&&d.direction.input!==directionFingerprint(d);
  $('generate-direction').disabled=!valid||!!directionJob||!!scriptJob||!!planJob;$('cancel-direction').hidden=!busy;$('generated-direction').hidden=!d.direction;
  if(d.direction)$('direction-markdown').value=d.direction.markdown;$('direction-markdown').disabled=busy;
- $('direction-status').textContent=busy?'Thinking… mapping the script to your slides and adding delivery cues.':!valid?'Approve the current script first.':stale?'The script or original slides changed. Regenerate instructions.':d.direction?'Generated with '+d.direction.model+'. Review slide references, pointing suggestions and delivery.':'Your uploaded slides stay unchanged. Narration is copied from the approved script.';
+ $('direction-status').textContent=busy?'Thinking… mapping the script to your slides and adding delivery cues.':!valid?'Approve the current script first.':stale?'The script or original slides changed. Regenerate instructions.':d.direction?'Generated with '+d.direction.model+'. Review slide references, pointing suggestions and delivery.':'Your approved slides stay unchanged. Narration is copied from the approved script.';
  $('approve-direction').disabled=!valid||busy||!d.direction||stale||!d.direction.markdown.trim()||!!d.direction.approved;
  $('next-voice').disabled=!directionReady(d)||!!directionJob;
  $('direction-approval').textContent=valid&&!stale&&d.direction?.approved?'Presenter instructions approved. Ready for modular voice preparation.':'';
 }
 $('generate-direction').onclick=async()=>{
  const d=current();if(!scriptReady(d)||directionJob)return;const input=directionFingerprint(d),controller=new AbortController();directionJob={id:d.id,controller};renderDirection();
- try{const r=await fetch('/api/direction',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({title:d.title,brief:d.brief,presentation:d.presentation,ai:d.ai,approved:d.approved,sources:d.sources,plan:d.plan,script:d.script})}),data=await r.json();if(!r.ok)throw Error(data.error||'Generation failed.');if(!drafts.includes(d)||input!==directionFingerprint(d)||!scriptReady(d))throw Error('The script changed. Generate again.');d.direction={...data,input,approved:null};save();directionJob=null;renderDirection();}
- catch(error){directionJob=null;if(current()?.id===d.id){renderDirection();$('direction-status').textContent=error.name==='AbortError'?'Cancelled. Previous instructions are unchanged.':error.message;}}
+ const notify=startNotificationTask('Presenter instructions');
+ try{const r=await fetch('/api/direction',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({title:d.title,brief:d.brief,presentation:d.presentation,ai:d.ai,approved:d.approved,sources:d.sources,plan:d.plan,script:d.script,slides:d.slides,assets:d.assets})}),data=await r.json();if(!r.ok)throw Error(data.error||'Generation failed.');if(!drafts.includes(d)||input!==directionFingerprint(d)||!scriptReady(d))throw Error('The script changed. Generate again.');d.direction={...data,input,approved:null};save();notify();directionJob=null;renderDirection();}
+ catch(error){notify(error);directionJob=null;if(current()?.id===d.id){renderDirection();$('direction-status').textContent=error.name==='AbortError'?'Cancelled. Previous instructions are unchanged.':error.message;}}
 };
 $('cancel-direction').onclick=()=>directionJob?.controller.abort();
 $('direction-markdown').oninput=()=>{const d=current();d.direction.markdown=$('direction-markdown').value;d.direction.approved=null;save();$('approve-direction').disabled=!scriptReady(d)||d.direction.input!==directionFingerprint(d)||!d.direction.markdown.trim();$('next-voice').disabled=!directionReady(d)||!!directionJob;
@@ -338,7 +370,7 @@ $('direction-markdown').oninput=()=>{const d=current();d.direction.markdown=$('d
 $('approve-direction').onclick=()=>{const d=current();if(!scriptReady(d)||directionJob||!d.direction?.markdown.trim()||d.direction.input!==directionFingerprint(d))return;d.direction.approved=new Date().toISOString();save();renderDirection();};
 $('download-direction').onclick=()=>{const url=URL.createObjectURL(new Blob([current().direction.markdown],{type:'text/markdown'})),a=document.createElement('a');a.href=url;a.download='presenter-instructions.md';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 
-function directionReady(d){return scriptReady(d)&&!!d.direction?.approved&&d.direction.input===directionFingerprint(d);}
+function directionReady(d){return scriptReady(d)&&(d.presentation?.mode==='original'||slidesReady(d))&&!!d.direction?.approved&&d.direction.input===directionFingerprint(d);}
 function renderVoice(){
  const d=current();if(!d)return;const valid=directionReady(d),stale=d.voice&&d.voice.input!==voiceFingerprint(d),busy=voiceJob?.id===d.id;
  const total=d.voice?.clips.length||0,ready=d.voice?.clips.filter(c=>c.url).length||0,reviewed=d.voice?.clips.filter(c=>c.url&&c.reviewed).length||0,complete=total>0&&ready===total&&!stale;
@@ -348,8 +380,8 @@ function renderVoice(){
  $('prepare-voice').disabled=!valid||!!voiceJob||complete;$('stop-voice').hidden=!busy;
  $('prepare-voice').textContent=complete?'✓ All clips generated':busy?'Generating…':d.voice&&!stale?'Resume missing clips':'Prepare voice clips';
  $('voice-build-status').textContent=busy?'Preparing clip '+voiceJob.position+' of '+d.voice.clips.length+'…':!valid?'Approve the current presenter instructions first.':stale?'Presenter instructions changed. Prepare the voice set again.':d.voice?d.voice.clips.filter(c=>c.url).length+' of '+d.voice.clips.length+' clips ready. Sample any clips, then approve the whole set. Individual review is optional.':'Ready to generate short clips from the approved narration.';
- $('voice-clips').replaceChildren();
- for(const clip of d.voice?.clips||[]){const card=document.createElement('article');card.className='asset-review-card';const title=document.createElement('h4');title.textContent='Clip '+clip.id.replace('clip-','')+' · Script section '+clip.section;const text=document.createElement('p');text.textContent=clip.text;card.append(title,text);const status=document.createElement('span');status.className='clip-status';const active=busy&&voiceJob.position===d.voice.clips.indexOf(clip)+1&&!clip.url;status.textContent=stale?'Outdated':clip.url?(clip.reviewed?'✓ Reviewed':'✓ Generated'):active?'Generating…':clip.error?'Failed · retry available':'Queued';const progress=document.createElement('progress');progress.max=1;progress.setAttribute('aria-label','Progress for '+clip.id);if(!active)progress.value=clip.url?1:0;card.append(status,progress);
+ const openClips=new Set([...$('voice-clips').querySelectorAll('details[open]')].map(el=>el.dataset.clip));$('voice-clips').replaceChildren();
+ for(const clip of d.voice?.clips||[]){const card=document.createElement('details');card.className='asset-review-card voice-clip-row';card.dataset.clip=clip.id;card.open=openClips.has(clip.id);const title=document.createElement('summary');title.textContent='Clip '+clip.id.replace('clip-','')+' · Script section '+clip.section;const text=document.createElement('p');text.textContent=clip.text;card.append(title,text);const status=document.createElement('span');status.className='clip-status';const active=busy&&voiceJob.position===d.voice.clips.indexOf(clip)+1&&!clip.url;status.textContent=stale?'Outdated':clip.url?(clip.reviewed?'✓ Reviewed':'✓ Generated'):active?'Generating…':clip.error?'Failed · retry available':'Queued';const progress=document.createElement('progress');progress.max=1;progress.setAttribute('aria-label','Progress for '+clip.id);if(!active)progress.value=clip.url?1:0;title.append(status);card.append(progress);
  if(clip.url){const audio=document.createElement('audio');audio.controls=true;audio.preload='none';audio.src=clip.url;card.append(audio);const download=document.createElement('a');download.href=clip.url;download.download=clip.id+'.wav';download.textContent='Download WAV';card.append(download);const label=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.checked=clip.reviewed;check.disabled=busy||stale||!valid;check.onchange=()=>{clip.reviewed=check.checked;save();$('approve-voice').disabled=!directionReady(d)||!voiceReady(d)||!!d.voice.approved;status.textContent=clip.reviewed?'✓ Reviewed':'✓ Generated';$('voice-review-count').textContent=d.voice.clips.filter(c=>c.url&&c.reviewed).length+' of '+d.voice.clips.length+' reviewed (optional)';};label.append(check,document.createTextNode(' Listened and reviewed (optional)'));card.append(label);}else{const note=document.createElement('p');note.textContent=clip.error||'Waiting for voice generation';card.append(note);} $('voice-clips').append(card);}
  $('preview-playback').disabled=!valid||!voiceReady(d)||!d.voice?.approved||busy;
  $('approve-voice').disabled=!valid||busy||!voiceReady(d)||!!d.voice?.approved;$('voice-approval').textContent=valid&&voiceReady(d)&&d.voice.approved?'Voice set approved. Ready for avatar and playback integration.':'';
@@ -358,14 +390,16 @@ $('next-voice').onclick=()=>{if(directionReady(current()))go(9);};$('back-direct
 $('stop-voice').onclick=()=>{if(voiceJob)voiceJob.stop=true;$('voice-build-status').textContent='Stopping after the current clip finishes…';};
 $('prepare-voice').onclick=async()=>{
  const d=current();if(!directionReady(d)||voiceJob)return;
+ const notify=startNotificationTask('Narration clips');
  try{const input=voiceFingerprint(d);if(!d.voice||d.voice.input!==input)d.voice={input,clips:narrationClips(d.direction.markdown),approved:null};save();voiceJob={id:d.id,stop:false,position:0};
  for(const [i,clip] of d.voice.clips.entries()){
   if(voiceJob.stop||!drafts.includes(d)||!directionReady(d)||voiceFingerprint(d)!==input)break;if(clip.url)continue;
   voiceJob.position=i+1;if(current()?.id===d.id)renderVoice();
   try{const response=await fetch('/api/authoring-speech',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:clip.text}),signal:AbortSignal.timeout(190000)});if(!response.ok)throw Error('Voice preparation failed. Retry this set.');const result=await response.json();clip.url=result.url;clip.error=null;save();}
-  catch(error){clip.error=error.message;save();break;}
+  catch(error){notify(error);clip.error=error.message;save();break;}
  }
- }catch(error){$('voice-build-status').textContent=error.message;voiceJob=null;return;}
+ }catch(error){notify(error);$('voice-build-status').textContent=error.message;voiceJob=null;return;}
+ if(d.voice.clips.every(c=>c.url))notify();
  voiceJob=null;renderVoice();
 };
 $('approve-voice').onclick=()=>{const d=current();if(!directionReady(d)||!voiceReady(d)||voiceJob)return;d.voice.approved=new Date().toISOString();save();renderVoice();};
@@ -379,3 +413,102 @@ $('source-name').addEventListener('input',saveSourceBuffer);$('source-text').add
 function restoreSourceBuffer(){const restored=current()?.sourceBuffer;if(restored){$('manual-source').open=true;$('source-name').value=restored.name;$('source-text').value=restored.text;editingSource=restored.editingSource;importMetadata=restored.importMetadata;$('cancel-edit').hidden=!editingSource;$('source-form').querySelector('button[type=submit]').textContent=editingSource?'Save source':'Add source';$('word-count').textContent=(restored.text.trim().match(/\S+/g)||[]).length+' words';}}
 
 $('preview-playback').onclick=()=>{const d=current();if(directionReady(d)&&voiceReady(d)&&d.voice.approved){save();location.assign('/annotation-review.html?lecture='+encodeURIComponent(d.id));}};
+
+// Navigation reflects approval gates, independently from the saved editing step.
+function studioSteps(d){
+ const original=d.presentation?.mode==='original';
+ return [
+  {step:2,label:'Material',done:!!d.sources.length,enabled:true,hint:'Upload and inspect'},
+  {step:3,label:'Lecture details',done:!!d.approved,enabled:!!d.sources.length,hint:'Audience and outcomes'},
+  {step:4,label:'Confirm setup',done:!!d.approved,enabled:validDetails(d),hint:'Review your sources'},
+  {step:5,label:'Lecture plan',done:planReady(d),enabled:!!d.approved,hint:'Generate and approve'},
+  {step:6,label:'Presentation script',done:scriptReady(d),enabled:planReady(d),hint:'Narration and timing'},
+  ...(original?[
+   {step:8,label:'Presenter instructions',done:directionReady(d),enabled:scriptReady(d),hint:'Delivery and slide cues'},
+   {step:9,label:'Voice',done:directionReady(d)&&voiceReady(d)&&!!d.voice?.approved,enabled:directionReady(d),hint:'Generate and listen'},
+   {label:'Annotations & publish',done:!!d.annotationsApproved,enabled:directionReady(d)&&voiceReady(d)&&!!d.voice?.approved,href:'/annotation-review.html?lecture='+encodeURIComponent(d.id),hint:'Review, rehearse, publish'}
+  ]:[{step:7,label:'Visual assets',done:scriptReady(d)&&assetsReady(d)&&!!d.assets?.approved,enabled:scriptReady(d),hint:'Match and review visuals'},
+      {step:10,label:'HTML slides',done:slidesReady(d),enabled:scriptReady(d)&&assetsReady(d)&&!!d.assets?.approved,hint:'Generate, edit and review'},
+ {step:8,label:'Presenter instructions',done:directionReady(d),enabled:slidesReady(d)&&scriptReady(d),hint:'Delivery and slide cues'},
+ {step:9,label:'Voice',done:directionReady(d)&&voiceReady(d)&&!!d.voice?.approved,enabled:directionReady(d),hint:'Generate and listen'},
+ {label:'Annotations & publish',done:!!d.annotationsApproved,enabled:directionReady(d)&&voiceReady(d)&&!!d.voice?.approved,href:'/annotation-review.html?lecture='+encodeURIComponent(d.id),hint:'Review, rehearse, publish'}])
+ ];
+}
+function refreshStudioChrome(){
+ const d=current();$('lecture-count').textContent=drafts.length+' lecture'+(drafts.length===1?'':'s');
+ const query=$('lecture-search').value.toLowerCase().trim();
+ for(const button of $('draft-list').children)button.hidden=!button.textContent.toLowerCase().includes(query);
+ if(query){const count=[...$('draft-list').children].filter(b=>!b.hidden).length;$('lecture-count').textContent=count?count+' matching lecture'+(count===1?'':'s'):'No lectures match your search.';}
+ $('workflow-nav').replaceChildren();if(!d)return;
+ $('workspace-title').textContent=d.title||'Untitled lecture';
+ const steps=studioSteps(d),complete=steps.filter(s=>s.done).length;const pendingSource=!!editingSource||!!$('source-text').value.trim()||$('source-file').disabled;
+ const activeStep=steps.find(s=>s.step===d.wizardStep);$('draft-status').textContent=activeStep?.done?'Complete':activeStep?.enabled?'In progress':'Needs review';
+ $('workflow-progress').max=steps.length;$('workflow-progress').value=complete;
+ $('workflow-summary').textContent=complete+' of '+steps.length+' steps complete';
+ for(const [i,item] of steps.entries()){
+  if(pendingSource&&item.step!==2){item.enabled=false;item.hint='Save or cancel source edit';}
+  const li=document.createElement('li'),button=document.createElement(item.href&&item.enabled?'a':'button');
+  const symbol=document.createElement('span');symbol.className='step-symbol';symbol.textContent=item.done?'✓':String(i+1);
+  const label=document.createElement('span');label.textContent=item.label;const hint=document.createElement('small');hint.textContent=pendingSource&&item.step!==2?'Save or cancel source edit':item.done?'Complete':item.enabled?item.hint:item.step?'Complete the previous step':item.hint;label.append(hint);button.append(symbol,label);
+  if(item.href&&item.enabled)button.href=item.href;else{button.disabled=!item.enabled;button.type='button';button.onclick=()=>go(item.step);}
+  if(item.step===d.wizardStep)button.setAttribute('aria-current','step');
+  li.append(button);$('workflow-nav').append(li);
+ }
+ for(const [approve,next] of [['approve-plan','next-script'],['approve-script','next-assets'],['approve-direction','next-voice'],['approve-voice','preview-playback']]){
+  $(next).hidden=$(next).disabled;
+ }
+ for(const id of ['plan','script','direction'])updateDocumentPreview(id);
+}
+$('lecture-search').addEventListener('input',refreshStudioChrome);
+$('open-settings').onclick=()=>$('studio-settings').showModal();
+$('close-settings').onclick=()=>$('studio-settings').close();
+// Readable document previews use text nodes only; source content never becomes HTML.
+function updateDocumentPreview(id){
+ const input=$(id+'-markdown'),preview=$(id+'-preview');if(!preview||preview.dataset.value===input.value)return;
+ preview.dataset.value=input.value;preview.replaceChildren();
+ for(const line of input.value.split('\n')){
+  if(!line.trim())continue;
+  const heading=line.match(/^(#{1,6})\s+(.+)/),bullet=line.match(/^\s*[-*]\s+(.+)/);
+  const node=document.createElement(heading?'h'+Math.min(4,heading[1].length+1):'p');
+  node.textContent=heading?heading[2]:bullet?'• '+bullet[1]:line;
+  preview.append(node);
+ }
+}
+for(const id of ['plan','script','direction']){
+ const input=$(id+'-markdown'),toolbar=document.createElement('div'),preview=document.createElement('div');
+ toolbar.className='document-toolbar';toolbar.setAttribute('role','group');toolbar.setAttribute('aria-label','Document view');preview.id=id+'-preview';preview.className='document-preview';preview.tabIndex=0;
+ const read=document.createElement('button'),edit=document.createElement('button');read.type=edit.type='button';read.textContent='Read';edit.textContent='Edit Markdown';
+ function mode(editing){input.hidden=!editing;preview.hidden=editing;read.setAttribute('aria-pressed',String(!editing));edit.setAttribute('aria-pressed',String(editing));updateDocumentPreview(id);if(editing)input.focus();}
+ read.onclick=()=>mode(false);edit.onclick=()=>mode(true);toolbar.append(read,edit);input.before(toolbar,preview);input.addEventListener('input',()=>updateDocumentPreview(id));mode(false);
+}
+let chromeRefresh;
+new MutationObserver(records=>{if(records.every(r=>(r.target.nodeType===1?r.target:r.target.parentElement)?.closest('.workflow-progress, #draft-status, .document-preview, .document-toolbar')))return;clearTimeout(chromeRefresh);chromeRefresh=setTimeout(refreshStudioChrome,20);}).observe($('editor'),{subtree:true,childList:true,attributes:true,attributeFilter:['disabled']});
+// Observe the save status as edits can invalidate a downstream approval.
+new MutationObserver(()=>{clearTimeout(chromeRefresh);chromeRefresh=setTimeout(refreshStudioChrome,20);}).observe($('autosave-status'),{childList:true});
+refreshStudioChrome();
+
+const studioNarrow=matchMedia('(max-width:720px)');$('lecture-library').open=!studioNarrow.matches;studioNarrow.addEventListener('change',e=>{$('lecture-library').open=!e.matches;});
+
+function renderSlides(){
+ const d=current();if(!d)return;const ready=scriptReady(d)&&assetsReady(d)&&!!d.assets?.approved,stale=d.slides&&d.slides.input!==slidesFingerprint(d),busy=slidesJob?.id===d.id;
+ $('generate-slides').disabled=!ready||!!slidesJob;$('cancel-slides').hidden=!busy;
+ $('slides-status').textContent=busy?'Thinking… composing your slides.':!ready?'Approve the current script and assets first.':stale?'Script or assets changed. Generate the deck again.':slidesReady(d)?'Slide deck approved. Continue to presenter instructions.':d.slides?`${d.slides.items.filter(s=>s.reviewed).length} of ${d.slides.items.length} slides reviewed`:'Ready to generate slides from your approved script and visuals.';
+ $('next-presenter').hidden=!ready||!slidesReady(d)||busy;
+ $('slides-list').replaceChildren();
+ for(const [i,slide] of (d.slides?.items||[]).entries()){
+ const card=document.createElement('details');card.open=i===0;const summary=document.createElement('summary');summary.textContent=`${i+1}. ${slide.title} · ${slide.reviewed?'Reviewed':'Needs review'}`;
+ const frame=document.createElement('iframe');frame.title='Slide '+(i+1);frame.sandbox='';frame.style.cssText='width:100%;height:450px;border:1px solid #dce3f0;border-radius:12px';frame.srcdoc=deckHTML([slide],approvedVisuals(d));
+ const title=document.createElement('input');title.value=slide.title;title.maxLength=160;title.setAttribute('aria-label','Title for slide '+(i+1));
+ const bullets=document.createElement('textarea');bullets.value=slide.bullets.join('\n');bullets.rows=5;bullets.setAttribute('aria-label','One bullet per line for slide '+(i+1));
+ const edit=()=>{slide.title=title.value;slide.bullets=bullets.value.split('\n').filter(Boolean);slide.reviewed=false;d.slides.approved=null;save();frame.srcdoc=deckHTML([slide],approvedVisuals(d));review.textContent='Confirm slide';summary.textContent=`${i+1}. ${slide.title} · Needs review`;};title.oninput=edit;bullets.oninput=edit;
+ const review=document.createElement('button');review.className='control';review.textContent=slide.reviewed?'✓ Reviewed':'Confirm slide';review.disabled=busy||stale||!ready;review.onclick=()=>{if(!slide.title.trim()||slide.bullets.length>6||slide.bullets.some(b=>b.length>300)){$('slides-status').textContent='Use a title and up to six bullets, each no longer than 300 characters.';return;}slide.reviewed=true;save();renderSlides();};card.append(summary,frame,title,bullets,review);$('slides-list').append(card);
+ }
+ $('approve-slides').disabled=!ready||busy||stale||!d.slides?.items.length||!d.slides.items.every(s=>s.reviewed)||!!d.slides.approved;$('download-slides').disabled=!d.slides||stale;
+}
+$('next-slides').onclick=()=>go(10);$('back-assets').onclick=()=>go(7);
+$('generate-slides').onclick=async()=>{const d=current();if(slidesJob||!assetsReady(d)||!d.assets?.approved)return;const input=slidesFingerprint(d),controller=new AbortController();slidesJob={id:d.id,controller};renderSlides();const notify=startNotificationTask('HTML slides');try{const r=await fetch('/api/slides',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify(d)}),result=await r.json();if(!r.ok)throw Error(result.error||'Slide generation failed.');if(input!==slidesFingerprint(d)||!drafts.includes(d))throw Error('The source changed. Generate again.');d.slides={...result,input,approved:null};save();notify();slidesJob=null;if(current()?.id===d.id)renderSlides();}catch(e){notify(e);slidesJob=null;if(current()?.id===d.id){renderSlides();$('slides-status').textContent=e.name==='AbortError'?'Cancelled. Your saved slides are unchanged.':e.message;}}};
+$('cancel-slides').onclick=()=>slidesJob?.controller.abort();
+$('approve-slides').onclick=()=>{const d=current();if(!d.slides||d.slides.input!==slidesFingerprint(d)||!d.slides.items.every(s=>s.reviewed))return;d.slides.approved=new Date().toISOString();save();renderSlides();};
+$('download-slides').onclick=()=>{const d=current(),url=URL.createObjectURL(new Blob([deckHTML(d.slides.items,approvedVisuals(d))],{type:'text/html'})),a=document.createElement('a');a.href=url;a.download='lecture-slides.html';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+
+$('next-presenter').onclick=()=>{if(slidesReady(current())&&scriptReady(current()))go(8);};

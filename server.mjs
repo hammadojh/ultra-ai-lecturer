@@ -1,3 +1,7 @@
+import {renderGeneratedSlides} from './generated-slide-rendering.mjs';
+import {generateSlides} from './slide-generation.mjs';
+import {produceAsset} from './asset-production.mjs';
+import {createAuth,sessionToken,sessionCookie} from './auth.mjs';
 import {classroomLecture} from './classroom-lecture.mjs';
 import {publicationSnapshot} from './publishing.mjs';
 import {generateAnnotations} from './annotation-generation.mjs';
@@ -17,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { lecture } from './lecture.mjs';
 const root=fileURLToPath(new URL('.',import.meta.url));
+const auth=createAuth(process.env.ULTRA_AUTH_DIRECTORY||path.join(root,'.cache/auth'));
 const pending=new Map();let worker, failure, ready=false, loading=0;
 const inflight=new Map();
 const feedbackSegments=new Map();
@@ -54,11 +59,28 @@ async function synthesize(segment){
  })().finally(()=>inflight.delete(key));inflight.set(key,job);return job;
 }
 const types={'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.json':'application/json','.glb':'model/gltf-binary','.wasm':'application/wasm','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.pdf':'application/pdf'};
-const publicFiles=new Set(['admin.html','admin.css','admin.js','assets-client.mjs','voice-authoring.mjs','playback.html','playback.js','playback.css','annotations.mjs','classroom-lecture.mjs','annotation-review.html','annotation-review.js','index.html','app.js','style.css','lecture.mjs','player.mjs','presenter.mjs','discussion.mjs']);
+const publicFiles=new Set(['slides.mjs','notifications.mjs','login.html','login.js','login.css','account.js','admin.html','admin.css','admin.js','assets-client.mjs','voice-authoring.mjs','playback.html','playback.js','playback.css','annotations.mjs','classroom-lecture.mjs','annotation-review.html','annotation-review.js','index.html','app.js','style.css','lecture.mjs','player.mjs','presenter.mjs','discussion.mjs']);
 const server=http.createServer(async(req,res)=>{
  try{
   const url=new URL(req.url,'http://127.0.0.1');
   if(!['127.0.0.1:4173','localhost:4173'].includes(req.headers.host)){res.writeHead(403).end();return;}
+  const token=sessionToken(req),user=auth.session(token);
+  const json=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
+  if(!['GET','HEAD'].includes(req.method)&&req.headers.origin!==`http://${req.headers.host}`){json(403,{error:'Invalid request origin.'});return;}
+  if(url.pathname.startsWith('/api/auth/')){
+   if(url.pathname==='/api/auth/me'&&req.method==='GET'){json(200,{user,setupRequired:await auth.setupRequired()});return;}
+   if(req.method!=='POST'){json(405,{error:'Method not allowed.'});return;}
+   if(url.pathname==='/api/auth/logout'){auth.logout(token);res.setHeader('Set-Cookie',sessionCookie(''));json(200,{ok:true});return;}
+   if(!['/api/auth/login','/api/auth/register','/api/auth/setup'].includes(url.pathname)){json(404,{error:'Not found.'});return;}
+   if(auth.limited(req.socket.remoteAddress)){json(429,{error:'Too many attempts. Try again in ten minutes.'});return;}
+   let body='';for await(const chunk of req){body+=chunk;if(body.length>4096){json(413,{error:'Request too large.'});return;}}
+   try{const data=JSON.parse(body),result=url.pathname.endsWith('/login')?await auth.login(data):await auth.register(data,url.pathname.endsWith('/setup'));auth.logout(token);res.setHeader('Set-Cookie',sessionCookie(result.token));json(200,{user:result.user});}catch(e){json(400,{error:e.message});}return;
+  }
+  const anonymous=['/login.html','/login.js','/login.css'].includes(url.pathname);
+  if(!user&&!anonymous){if(url.pathname.startsWith('/api/'))json(401,{error:'Please sign in.'});else res.writeHead(302,{Location:'/login.html?next='+encodeURIComponent(url.pathname+url.search),'Cache-Control':'no-store'}).end();return;}
+  const studentApis=['/api/published','/api/discuss','/api/speech','/api/voice-status','/api/authoring-playback','/api/render-slides'];
+  const adminOnly=(url.pathname.startsWith('/api/')&&!studentApis.includes(url.pathname)&&!/^\/api\/published\/[a-zA-Z0-9-]+$/.test(url.pathname))||/^\/(admin|annotation-review|playback)\.(html|js)$/.test(url.pathname)||url.pathname.startsWith('/auth/');
+  if(user&&user.role!=='admin'&&adminOnly){json(403,{error:'Administrator access required.'});return;}
   if(url.pathname==='/api/published'&&req.method==='GET'){
    const directory=path.join(root,'.cache/published');await mkdir(directory,{recursive:true});const list=[];
    for(const name of await readdir(directory)){if(!name.endsWith('.json'))continue;try{const d=JSON.parse(await readFile(path.join(directory,name),'utf8'));list.push({id:d.id,title:d.title,duration:d.brief.duration,publishedAt:d.publishedAt});}catch{}}
@@ -70,7 +92,12 @@ const server=http.createServer(async(req,res)=>{
   if(url.pathname==='/api/publish'&&req.method==='POST'){
    if(req.headers.origin&&!['http://127.0.0.1:4173','http://localhost:4173'].includes(req.headers.origin)){res.writeHead(403).end();return;}
    let body='';for await(const chunk of req){body+=chunk;if(body.length>30000000){res.writeHead(413).end();return;}}
-   const snapshot=publicationSnapshot(JSON.parse(body)),directory=path.join(root,'.cache/published');await mkdir(directory,{recursive:true});const tmp=path.join(directory,randomUUID()+'.tmp');await writeFile(tmp,JSON.stringify(snapshot));await rename(tmp,path.join(directory,snapshot.id+'.json'));res.setHeader('Content-Type','application/json');res.end(JSON.stringify({id:snapshot.id,publishedAt:snapshot.publishedAt}));return;
+   const draft=JSON.parse(body),snapshot=publicationSnapshot(draft);if(draft.presentation?.mode!=='original')snapshot.renderedPages=(await renderGeneratedSlides(root,draft)).pages;const directory=path.join(root,'.cache/published');await mkdir(directory,{recursive:true});const tmp=path.join(directory,randomUUID()+'.tmp');await writeFile(tmp,JSON.stringify(snapshot));await rename(tmp,path.join(directory,snapshot.id+'.json'));res.setHeader('Content-Type','application/json');res.end(JSON.stringify({id:snapshot.id,publishedAt:snapshot.publishedAt}));return;
+  }
+  if(url.pathname==='/api/asset-production'&&req.method==='POST'){
+   let body='';for await(const chunk of req){body+=chunk;if(body.length>25000){json(413,{error:'Brief too large.'});return;}}
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),180000);res.on('close',()=>{if(!res.writableEnded)controller.abort();});
+   try{json(200,await produceAsset(JSON.parse(body),controller.signal));}catch(e){json(422,{error:e.name==='AbortError'?'Asset creation timed out. Retry.':e.message});}finally{clearTimeout(timer);}return;
   }
   if(url.pathname==='/api/annotations'&&req.method==='POST'){
    if(req.headers.origin&&!['http://127.0.0.1:4173','http://localhost:4173'].includes(req.headers.origin)){res.writeHead(403).end();return;}
@@ -78,6 +105,10 @@ const server=http.createServer(async(req,res)=>{
    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),120000);res.on('close',()=>{if(!res.writableEnded)controller.abort();});
    try{const data=await generateAnnotations(root,JSON.parse(body),controller.signal);res.setHeader('Content-Type','application/json');res.end(JSON.stringify(data));}
    finally{clearTimeout(timer);}return;
+  }
+  if(url.pathname==='/api/render-generated-slides'&&req.method==='POST'){
+   let body='';for await(const chunk of req){body+=chunk;if(body.length>30000000){json(413,{error:'Deck too large.'});return;}}
+   json(200,await renderGeneratedSlides(root,JSON.parse(body)));return;
   }
   if(url.pathname==='/api/render-slides'&&req.method==='POST'){
    if(req.headers.origin&&!['http://127.0.0.1:4173','http://localhost:4173'].includes(req.headers.origin)){res.writeHead(403).end();return;}
@@ -133,12 +164,12 @@ const server=http.createServer(async(req,res)=>{
    else{res.writeHead(404).end();return;}
    res.setHeader('Content-Type','application/json');res.end(JSON.stringify(result));return;
   }
-  if(['/api/plan','/api/script','/api/assets','/api/direction'].includes(url.pathname)&&req.method==='POST'){
+  if(['/api/plan','/api/script','/api/assets','/api/direction','/api/slides'].includes(url.pathname)&&req.method==='POST'){
    if(req.headers.origin&&!['http://127.0.0.1:4173','http://localhost:4173'].includes(req.headers.origin)){res.writeHead(403).end();return;}
-   req.setEncoding('utf8');let body='';for await(const chunk of req){body+=chunk;if(body.length>1000000){res.writeHead(413,{'Content-Type':'application/json'}).end(JSON.stringify({error:'Source request is too large. Split the lecture.'}));return;}}
+   req.setEncoding('utf8');let body='';for await(const chunk of req){body+=chunk;if(body.length>(['/api/slides','/api/direction'].includes(url.pathname)?30000000:1000000)){res.writeHead(413,{'Content-Type':'application/json'}).end(JSON.stringify({error:'Source request is too large. Split the lecture.'}));return;}}
    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),300000);
    const disconnected=()=>{if(!res.writableEnded)controller.abort();};res.on('close',disconnected);
-   try{const result=await (url.pathname==='/api/direction'?generateDirection:url.pathname==='/api/assets'?generateAssetBrief:url.pathname==='/api/script'?generateScript:generatePlan)(JSON.parse(body),controller.signal);res.writeHead(200,{'Content-Type':'application/json'}).end(JSON.stringify(result));}
+   try{const result=await (url.pathname==='/api/slides'?generateSlides:url.pathname==='/api/direction'?generateDirection:url.pathname==='/api/assets'?generateAssetBrief:url.pathname==='/api/script'?generateScript:generatePlan)(JSON.parse(body),controller.signal);res.writeHead(200,{'Content-Type':'application/json'}).end(JSON.stringify(result));}
    catch(error){res.writeHead(422,{'Content-Type':'application/json'}).end(JSON.stringify({error:error.name==='AbortError'?'Plan generation timed out. Try fewer sources.':error.message}));}
    finally{clearTimeout(timer);res.off('close',disconnected);}return;
   }
@@ -181,13 +212,13 @@ const server=http.createServer(async(req,res)=>{
    res.on('close',()=>{if(!res.writableEnded)controller.abort();});
    try{
     let authored=null;
-    if(publishedId){if(!/^[a-zA-Z0-9-]{1,80}$/.test(publishedId))throw Error('Invalid lecture');const d=JSON.parse(await readFile(path.join(root,'.cache/published',publishedId+'.json'),'utf8')),source=d.sources.find(s=>s.id===d.presentation.sourceId);let pages=source.import.assets.filter(a=>a.kind==='page');if(!pages.length)pages=(await renderOriginalSlides(root,source.import.originalUrl)).pages;authored=classroomLecture(d,pages);}
-    const result=await generateFeedback(messages,history,controller.signal,checkpointId,authored);
+    if(publishedId){if(!/^[a-zA-Z0-9-]{1,80}$/.test(publishedId))throw Error('Invalid lecture');const d=JSON.parse(await readFile(path.join(root,'.cache/published',publishedId+'.json'),'utf8'));let pages=d.renderedPages;if(!pages){const source=d.sources.find(s=>s.id===d.presentation.sourceId);pages=source.import.assets.filter(a=>a.kind==='page');if(!pages.length)pages=(await renderOriginalSlides(root,source.import.originalUrl)).pages;}authored=classroomLecture(d,pages);}
+    const result=await generateFeedback(messages,history,controller.signal,checkpointId,authored,undefined,user.name);
     const id='feedback-'+randomUUID();
     for(const [key,value] of feedbackSegments)if(value.expires<Date.now())feedbackSegments.delete(key);
     if(feedbackSegments.size>=100)feedbackSegments.delete(feedbackSegments.keys().next().value);
     feedbackSegments.set(id,{id,text:result.text,expires:Date.now()+1200000});
-    res.setHeader('Content-Type','application/json');res.end(JSON.stringify({...result,segmentId:id,model:process.env.ULTRA_CHAT_MODEL||'qwen3:14b'}));
+    res.setHeader('Content-Type','application/json');res.end(JSON.stringify({...result,segmentId:id}));
    }finally{clearTimeout(timer);}return;
   }
   if(url.pathname==='/api/authoring-playback'&&req.method==='POST'){

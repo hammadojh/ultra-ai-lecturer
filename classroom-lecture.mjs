@@ -6,5 +6,5 @@ export function classroomLecture(d,pages){
  return {...clip,prepared:true,slide:String(slide),duration:Math.max(2,clip.text.split(/\s+/).length/2.2),holdAfter:boundary&&kind==='checkpoint',finalCheckpoint:boundary&&kind==='final_qa',question:clip.text,answerSeconds:30,annotations:d.annotations?.[annotationKey(d,clip,slide)]||[]};});
  const numbers=[...new Set(segments.map(s=>s.slide))];
  const slides=numbers.map(number=>{const page=pages.find(p=>p.page===Number(number));if(!page)throw Error('Original slide '+number+' is missing.');return {id:number,chapter:'SLIDE '+number,title:'',body:'',html:'',image:page.url};});
- return {id:d.id,title:d.title,discussion:{budgetSeconds:90,idleSeconds:30,reserveSeconds:20},slides,segments,sourceText:source.text};
+ return {id:d.id,title:d.title,discussion:{budgetSeconds:90,idleSeconds:30,reserveSeconds:20},slides,segments,sourceText:source?.text||d.sources.map(s=>s.text).join('\n')};
 }
