@@ -1,7 +1,7 @@
 import {createSimliApi} from './simli-api.mjs';
 import {createLiveAvatarApi} from './liveavatar-api.mjs';
 import {createLectureSettings} from './lecture-settings.mjs';
-import {streamReply} from './reply-stream.mjs';
+import {streamReply} from '../../public/reply-stream.mjs';
 import {replySpeech,publishedVoiceProfile} from './reply-voice.mjs';
 import {createStudioMcp} from './studio-mcp.mjs';
 import {packageApi,exportPackage,safePackagePath} from './lecture-packages.mjs';
@@ -13,7 +13,7 @@ import {renderGeneratedSlides} from './generated-slide-rendering.mjs';
 import {generateSlides} from './slide-generation.mjs';
 import {produceAsset} from './asset-production.mjs';
 import {createAuth,sessionToken,sessionCookie} from './auth.mjs';
-import {classroomLecture} from './classroom-lecture.mjs';
+import {classroomLecture} from '../../public/classroom-lecture.mjs';
 import {publicationSnapshot} from './publishing.mjs';
 import {generateAnnotations} from './annotation-generation.mjs';
 import {renderOriginalSlides} from './slide-rendering.mjs';
@@ -30,8 +30,8 @@ import { generateFeedback } from './feedback.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { lecture } from './lecture.mjs';
-const root=fileURLToPath(new URL('.',import.meta.url));
+import { lecture } from '../../public/lecture.mjs';
+const root=fileURLToPath(new URL('../../',import.meta.url));
 const port=Number(process.env.ULTRA_PORT||4173);
 if(!Number.isInteger(port)||port<1024||port>65535)throw Error('Invalid ULTRA_PORT');
 const liveAvatar=createLiveAvatarApi({root});
@@ -52,7 +52,7 @@ const feedbackSegments=new Map();
 function startWorker(){
  if(worker)return;
  failure=null;ready=false;
- worker=new Worker(new URL('./node_modules/@met4citizen/headtts/modules/worker-tts.mjs',import.meta.url));
+ worker=new Worker(new URL('../../node_modules/@met4citizen/headtts/modules/worker-tts.mjs',import.meta.url));
  worker.on('message',message=>{
   if(message.type==='ready'){ready=true;console.log('Local voice model ready');return;}
   if(message.type==='progress'){loading=message.data.lengthComputable?Math.round(message.data.loaded/message.data.total*100):0;return;}
@@ -312,7 +312,8 @@ const server=http.createServer(async(req,res)=>{
   }
   let relative=decodeURIComponent(url.pathname).replace(/^\//,'')||'index.html';
   const allowed=publicFiles.has(relative)||relative.startsWith('assets/')||relative==='node_modules/livekit-client/dist/livekit-client.umd.js'||relative.startsWith('node_modules/three/')||relative.startsWith('node_modules/@met4citizen/talkinghead/');
-  const filename=path.resolve(root,relative);
+  const staticRoot=relative.startsWith('node_modules/')?root:path.join(root,'public');
+  const filename=path.resolve(staticRoot,relative);
   if(relative.split('/').includes('..')||!allowed||!filename.startsWith(root)||!(await stat(filename)).isFile()){res.writeHead(404).end('Not found');return;}
   res.setHeader('Content-Type',types[path.extname(filename)]||'application/octet-stream');res.setHeader('Cache-Control','no-cache');res.end(await readFile(filename));
  }catch(error){res.writeHead(500,{'Content-Type':'application/json'});res.end(JSON.stringify({error:error.message}));}

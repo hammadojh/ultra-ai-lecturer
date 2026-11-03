@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Discussion } from '../discussion.mjs';
-import { validateBatch,validateResponse } from '../feedback.mjs';
-import { LecturePlayer } from '../player.mjs';
-import { lecture } from '../lecture.mjs';
+import { Discussion } from '../public/discussion.mjs';
+import { validateBatch,validateResponse } from '../src/server/feedback.mjs';
+import { LecturePlayer } from '../public/player.mjs';
+import { lecture } from '../public/lecture.mjs';
 test('new messages never interrupt selected batch; coverage commits after delivery',()=>{
  const d=new Discussion();const a=d.add('9','answer');d.start();assert.equal(d.select().length,1);
  const b=d.add('Why multiply?');assert.equal(d.state,'reviewing');assert.equal(a.status,'selected');

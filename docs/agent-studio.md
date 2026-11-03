@@ -26,12 +26,12 @@ This integration matches the existing **local, administrator-only Studio**. The 
 
 `docs/lecture-package.md` defines version 1 of the portable ZIP contract. It is included with copied/downloaded skills and the full bundle. Skills remain usable independently with external agents.
 
-- `ultra-agent.mjs`: workspace preparation, per-user runtime environment, process lifecycle, authenticated HTTP/WebSocket gateway, source uploads and generated-package handoff.
-- `studio-src/ultra-agent.jsx`: native agent frame, source upload and review controls.
-- `studio-src/lecture-library.jsx`: method chooser, package management and publication.
-- `lecture-packages.mjs`: bounded ZIP validation, media verification, staging, publication, replacement history and export. Audio validation requires ffprobe (or ULTRA_FFPROBE).
-- `studio-src/main.jsx`, `studio-skills.json`, `studio-skills/*/SKILL.md`: portable skill catalog and download bundle.
-- `server.mjs`: admin authentication and routes. Classroom media remains authenticated.
+- `src/server/ultra-agent.mjs`: workspace preparation, per-user runtime environment, process lifecycle, authenticated HTTP/WebSocket gateway, source uploads and generated-package handoff.
+- `src/studio/ultra-agent.jsx`: native agent frame, source upload and review controls.
+- `src/studio/lecture-library.jsx`: method chooser, package management and publication.
+- `src/server/lecture-packages.mjs`: bounded ZIP validation, media verification, staging, publication, replacement history and export. Audio validation requires ffprobe (or ULTRA_FFPROBE).
+- `src/studio/main.jsx`, `studio-skills.json`, `studio-skills/*/SKILL.md`: portable skill catalog and download bundle.
+- `src/server/server.mjs`: admin authentication and routes. Classroom media remains authenticated.
 
 Agent data lives under `.cache/ultra-agent/<user-hash>/`; uploaded packages under `.cache/packages`; published snapshots under `.cache/published`; replaced snapshots under `.cache/publication-history`. Earlier authoring data remains available. Legacy export includes classroom images, cached audio, article and available working files; missing media yields a clear error instead of an incomplete export.
 
@@ -55,4 +55,4 @@ Changing voice requires explicit confirmation to regenerate every classroom audi
 
 Review generated clips before publishing. Word timings are regenerated; annotation timings are scaled and require review. Bundled standalone HTML/animation source files retain their original timing, as noted in the regenerated package. Publication replaces the snapshot atomically, preserves its lecture link, saves the previous version, and rejects stale edits. The selected voice profile also controls classroom question replies; the existing Kokoro fallback remains available for replies.
 
-Jobs persist under `.cache/lecture-settings/`, with staged media under `.cache/packages/`. `lecture-settings.mjs` implements estimates, regeneration, recovery and publication; `studio-src/lecture-presentation.jsx` provides the editor controls.
+Jobs persist under `.cache/lecture-settings/`, with staged media under `.cache/packages/`. `src/server/lecture-settings.mjs` implements estimates, regeneration, recovery and publication; `src/studio/lecture-presentation.jsx` provides the editor controls.

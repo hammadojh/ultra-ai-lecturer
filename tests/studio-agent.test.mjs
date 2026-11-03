@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {runStudio,skills,addArtifact,artifactCurrent,migrate} from '../studio-agent.mjs';
+import {runStudio,skills,addArtifact,artifactCurrent,migrate} from '../src/server/studio-agent.mjs';
 const project=()=>({id:'test',title:'Test',audience:'Beginners',sources:[],artifacts:[],messages:[],model:'test'});
 const action=(action,extra={})=>JSON.stringify({action,message:'',skill:'',inputIds:[],artifactId:'',title:'',content:'',...extra});
 const run=(p,steps)=>runStudio(p,{signal:new AbortController().signal,root:'.',event:()=>{},generate:async()=>{assert.ok(steps.length,'Unexpected extra model call');return steps.shift();}});

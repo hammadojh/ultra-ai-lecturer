@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { zipSync,strToU8 } from 'fflate';
-import { extractDocument } from '../extraction.mjs';
+import { extractDocument } from '../src/server/extraction.mjs';
 import { writeFile } from 'node:fs/promises';
 function deck(){
  const entries={

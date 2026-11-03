@@ -4,8 +4,8 @@ import {mkdtemp,mkdir,writeFile,readFile,rm} from 'node:fs/promises';
 import path from 'node:path';
 import {tmpdir} from 'node:os';
 import {zipSync,strToU8} from 'fflate';
-import {createLectureSettings,regenerationEstimate} from '../lecture-settings.mjs';
-import {readPackage} from '../lecture-packages.mjs';
+import {createLectureSettings,regenerationEstimate} from '../src/server/lecture-settings.mjs';
+import {readPackage} from '../src/server/lecture-packages.mjs';
 const profile={provider:'elevenlabs',voiceId:'oldVoice',model:'eleven_v4',settings:{stability:.5}};
 async function fixture(generate){
  const root=await mkdtemp(path.join(tmpdir(),'lecture-settings-test-')),id='lesson';

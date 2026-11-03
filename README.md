@@ -29,13 +29,27 @@ Use **My lectures → Enter classroom → Start lecture**. Enable Lecturer voice
 
 The app still has no authentication, enrollment backend, shared session authority, real online presence, or shared multi-student Q&A. The solo preview advances on Omar’s answer; shared sessions will require authoritative enrollment and response tracking. No microphone is required or recorded.
 
+## Project layout
+
+- `public/`: browser pages, styles, scripts, shared browser/runtime modules, and media in `public/assets/`.
+- `src/server/`: HTTP server, provider integrations, generation, authentication, and storage modules.
+- `src/studio/`: React authoring studio source; builds into `public/studio-ui.js`.
+- `studio-skills/` and `studio-skills.json`: teaching instructions and their catalog.
+- `scripts/`: voice setup and browser bundle entry points.
+- `tests/`: automated checks and fixtures.
+- `docs/` and `licenses/`: product/technical documentation and asset licenses.
+- `.cache/`: ignored local accounts, credentials, models, and generated lecture data.
+- `output/`: ignored local review artifacts.
+
+Run `npm start` from the project root. Browser URLs remain unchanged: the server serves its explicit allowlist from `public/` and selected dependencies from `node_modules/`. Backend source is not served. Rebuild browser bundles with `npm run build:studio` and `npm run build:simli` after changing their source.
+
 ## Implementation
 
-- `lecture.mjs`: approved slide content and narration segments.
-- `player.mjs`: deterministic lecture/activity state machine.
-- `presenter.mjs`: avatar loading, speech fetching, audio trimming and lip-sync.
-- `server.mjs`: restricted local static server, approved-segment speech endpoint, HeadTTS worker, content-addressed speech cache. It accepts segment IDs, not arbitrary text.
-- `app.js`: classroom interactions, captions, highlighting, focus mode and playback coordination.
+- `public/lecture.mjs`: approved slide content and narration segments.
+- `public/player.mjs`: deterministic lecture/activity state machine.
+- `public/presenter.mjs`: avatar loading, speech fetching, audio trimming and lip-sync.
+- `src/server/server.mjs`: restricted local static server, approved-segment speech endpoint, HeadTTS worker, content-addressed speech cache. It accepts segment IDs, not arbitrary text.
+- `public/app.js`: classroom interactions, captions, highlighting, focus mode and playback coordination.
 - `licenses/ASSETS.md`: provenance and licenses for the avatar and dependencies.
 
 ```sh
@@ -66,7 +80,7 @@ Ollama must be running at `http://127.0.0.1:11434` with `qwen3:14b` installed. I
 
 The checkpoint allows **90 seconds for discussion** after collection, with a **12-second idle follow-up window** after each response. New messages during a response are queued for the next batch. Generation has a 40-second request timeout; lack of remaining delivery time defers the batch. An already-playing short response finishes naturally rather than being cut off at the budget. Speech preparation that runs out of discussion time is cancelled locally. Empty queues, idle follow-up windows and exhausted budgets return to the saved narration segment. Deferred messages remain visible. The final checkpoint revisits deferred messages; there is no automated post-class answering.
 
-`discussion.mjs` owns the queue/state/budget; `feedback.mjs` validates and generates responses. `server.mjs` temporarily registers validated generated text as speech segments (20-minute IDs, bounded to 100), so the browser cannot request arbitrary TTS text. Restart clears the local session queue. Messages live in the browser; generated audio is cached on disk and can be removed by deleting `.cache/speech/`.
+`public/discussion.mjs` owns the queue/state/budget; `src/server/feedback.mjs` validates and generates responses. `src/server/server.mjs` temporarily registers validated generated text as speech segments (20-minute IDs, bounded to 100), so the browser cannot request arbitrary TTS text. Restart clears the local session queue. Messages live in the browser; generated audio is cached on disk and can be removed by deleting `.cache/speech/`.
 
 This remains one browser, with Omar as its only student. Feedback addresses Omar by name. Real multi-user attendance, all-students-answered detection, shared timers, admin controls and durable discussion history remain future work. Avatar quality is intentionally unchanged.
 

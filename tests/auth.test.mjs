@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,rm,readFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {createAuth} from '../auth.mjs';
+import {createAuth} from '../src/server/auth.mjs';
 test('setup, roles, password hashing, sessions and logout',async()=>{
  const dir=await mkdtemp(path.join(os.tmpdir(),'ultra-auth-'));try{
  const auth=createAuth(dir);const data={name:'Test Admin',email:'admin@example.test',password:'testing-password-123'};

@@ -1,5 +1,5 @@
 import { chatgptPlan } from './chatgpt.mjs';
-import { lecture } from './lecture.mjs';
+import { lecture } from '../../public/lecture.mjs';
 export function validateBatch(messages){
  if(!Array.isArray(messages)||!messages.length||messages.length>40)throw new Error('Provide 1–40 pending messages');
  const ids=new Set();for(const m of messages){if(typeof m.id!=='string'||!/^[a-zA-Z0-9-]{1,60}$/.test(m.id)||ids.has(m.id)||typeof m.text!=='string'||!m.text.trim()||m.text.length>500||!['question','answer'].includes(m.kind))throw new Error('Invalid message');ids.add(m.id);}

@@ -1,6 +1,6 @@
 import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import {mkdir,readFile,writeFile,rename,chmod} from 'node:fs/promises';
-const dir=new URL('./.cache/openrouter/',import.meta.url),file=new URL('connection.json',dir),api='https://openrouter.ai/api/v1';
+const dir=new URL('../../.cache/openrouter/',import.meta.url),file=new URL('connection.json',dir),api='https://openrouter.ai/api/v1';
 let version=0;const attempts=new Map();
 async function read(){try{return JSON.parse(await readFile(file,'utf8'));}catch(e){if(e.code==='ENOENT')return {};throw Error('Cannot read OpenRouter connection.');}}
 async function save(value){await mkdir(dir,{recursive:true,mode:0o700});await chmod(dir,0o700);const tmp=new URL(randomUUID()+'.tmp',dir);await writeFile(tmp,JSON.stringify(value),{mode:0o600});await rename(tmp,file);}

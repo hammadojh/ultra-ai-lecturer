@@ -1,5 +1,5 @@
 import {generateStructured} from './planning.mjs';
-import {sourceUnits,validateSplit} from './lecture-splitting.mjs';
+import {sourceUnits,validateSplit} from '../../public/lecture-splitting.mjs';
 export async function proposeSplit(d,signal){
  if(!d.approved||!Array.isArray(d.sources)||!d.sources.length||d.sources.some(s=>typeof s.text!=='string'))throw Error('Confirm the sources first.');
  const units=sourceUnits(d.sources);if(units.length>400)throw Error('This source collection is too large for one split proposal. Upload a smaller collection.');

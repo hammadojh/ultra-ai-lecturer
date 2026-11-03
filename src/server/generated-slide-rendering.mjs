@@ -4,7 +4,7 @@ import {mkdir,readFile,writeFile,rm} from 'node:fs/promises';
 import {createHash,randomUUID} from 'node:crypto';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {slidesReady,approvedVisuals,deckHTML} from './slides.mjs';
+import {slidesReady,approvedVisuals,deckHTML} from '../../public/slides.mjs';
 const execute=promisify(execFile),jobs=new Map();
 export async function renderGeneratedSlides(root,d){
  if(!slidesReady(d))throw Error('Approve the current generated slide deck first.');

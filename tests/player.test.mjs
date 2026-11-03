@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LecturePlayer } from '../player.mjs';
-import { lecture } from '../lecture.mjs';
+import { LecturePlayer } from '../public/player.mjs';
+import { lecture } from '../public/lecture.mjs';
 test('pause preserves exact position and resume consumes only new time',()=>{
  const p=new LecturePlayer(lecture.segments);p.play();p.tick(2.5);p.pause();p.tick(100);
  assert.equal(p.elapsed,2.5);p.play();p.tick(2);assert.equal(p.elapsed,4.5);assert.equal(p.segment.id,'goals-input');

@@ -1,7 +1,7 @@
 import {generateStructured} from './planning.mjs';
 import {scriptSegments} from './directing.mjs';
-import {assetsReady,sourceAssets} from './assets-client.mjs';
-import {validateSlides} from './slides.mjs';
+import {assetsReady,sourceAssets} from '../../public/assets-client.mjs';
+import {validateSlides} from '../../public/slides.mjs';
 export async function generateSlides(d,signal){
  if(d.presentation?.mode==='original'||!d.assets?.approved||!assetsReady(d)||!d.script?.approved)throw Error('Approve the current script and asset descriptions first.');
  const segments=d.slides?.segments||scriptSegments(d.script.markdown);

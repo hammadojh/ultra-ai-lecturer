@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readResponseStream,finishSignIn} from '../chatgpt.mjs';
+import {readResponseStream,finishSignIn} from '../src/server/chatgpt.mjs';
 function stream(events){const bytes=new TextEncoder().encode(events.map(e=>'data: '+JSON.stringify(e)+'\n\n').join(''));return new ReadableStream({start(c){for(let i=0;i<bytes.length;i+=7)c.enqueue(bytes.slice(i,i+7));c.close();}});}
 test('collects split UTF8 deltas only after completion',async()=>{assert.equal(await readResponseStream(stream([{type:'response.output_text.delta',delta:'Hello عمر'},{type:'response.completed'}])),'Hello عمر');});
 test('rejects a late error despite partial text',async()=>{await assert.rejects(readResponseStream(stream([{type:'response.output_text.delta',delta:'partial'},{type:'response.failed',response:{error:{code:'usage_limit'}}}])),/usage_limit/);});

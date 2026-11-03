@@ -1,4 +1,4 @@
-import {avatars} from './avatar-catalog.mjs';
+import {avatars} from '../../public/avatar-catalog.mjs';
 import {voiceProfile,generationVoiceProfile} from './reply-voice.mjs';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';

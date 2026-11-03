@@ -1,12 +1,12 @@
 import LectureLibrary from './lecture-library.jsx';
-import packageGuide from '../docs/lecture-package.md';
+import packageGuide from '../../docs/lecture-package.md';
 import React,{useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {zipSync,strToU8} from 'fflate';
-import skills from '../studio-skills.json';
-import {user} from '../account.js';
+import skills from '../../studio-skills.json';
+import {user} from '../../public/account.js';
 import content from './skill-content.js';
 const descriptions={
  'ultra':'Guide the complete process, review every stage and assemble a classroom-ready lecture ZIP.',

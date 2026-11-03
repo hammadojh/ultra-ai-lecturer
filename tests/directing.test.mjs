@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {scriptSegments,validateCues,directorMarkdown} from '../directing.mjs';
-import {scriptMarkdown} from '../scripting.mjs';
+import {scriptSegments,validateCues,directorMarkdown} from '../src/server/directing.mjs';
+import {scriptMarkdown} from '../src/server/scripting.mjs';
 const script={segments:[{title:'Explain',seconds:60,kind:'narration',say:'Seven doubled is fourteen.',show:'The original example',actions:'Pause.',sourceIds:['s']},{title:'Final Q&A',seconds:60,kind:'final_qa',say:'What questions remain?',show:'Summary',actions:'Invite questions.',sourceIds:['s']}]};
 const md=scriptMarkdown(script,{title:'Test',brief:{duration:2},sources:[{id:'s',name:'Deck'}]});
 const segments=scriptSegments(md),cues=segments.map(s=>({segmentId:s.id,slide:1,tone:'calm',energy:'medium',pointTo:'',delivery:'Pause after the sentence.'}));

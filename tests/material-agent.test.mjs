@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {runMaterial,materialInput,validateMaterial} from '../material-agent.mjs';
-import {materialCurrent,sourceFingerprint,studioModules} from '../studio-modules.mjs';
+import {runMaterial,materialInput,validateMaterial} from '../src/server/material-agent.mjs';
+import {materialCurrent,sourceFingerprint,studioModules} from '../src/server/studio-modules.mjs';
 const project=()=>({title:'Functions',audience:'Beginners',model:'test',sources:[{id:'one',name:'Notes',text:'A function maps each input to one output.'}],messages:[{role:'user',text:'Create the article.'}]});
 test('writer hands off to reviewer and stores a source-bound artifact',async()=>{const p=project(),calls=[],phases=[];const result=await runMaterial(p,null,x=>phases.push(x),async(_,messages)=>{calls.push(messages);return JSON.stringify({message:'Ready',markdown:'# Functions\nA function maps inputs to outputs. [S1]',reviewNotes:['Check examples.']});});assert.equal(calls.length,2);assert.equal(phases.length,2);assert.match(calls[1][1].content,/candidate/);assert.equal(result.input,sourceFingerprint(p));p.article=result;assert.equal(materialCurrent(p),true);p.sources[0].text+=' Changed.';assert.equal(materialCurrent(p),false);});
 test('clarification does not replace the article or call the reviewer',async()=>{let calls=0;const result=await runMaterial(project(),null,()=>{},async()=>{calls++;return JSON.stringify({message:'Which audience?',markdown:'',reviewNotes:[]});});assert.equal(calls,1);assert.equal(result.markdown,'');});

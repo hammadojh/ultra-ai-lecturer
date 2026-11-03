@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {createLiveAvatarApi} from '../liveavatar-api.mjs';
+import {createLiveAvatarApi} from '../src/server/liveavatar-api.mjs';
 test('HeyGen session credentials stay server-side and another user cannot stop a session',async()=>{
  const root=await mkdtemp(path.join(tmpdir(),'ultra-heygen-'));await mkdir(path.join(root,'.cache/liveavatar'),{recursive:true});await writeFile(path.join(root,'.cache/liveavatar/key'),'test-workspace-key');const calls=[];
  const service=createLiveAvatarApi({root,request:async(url,options)=>{calls.push({url,...options,body:JSON.parse(options.body)});return {ok:true,json:async()=>({data:url.endsWith('/token')?{session_token:'private-session-token'}:url.endsWith('/start')?{session_id:'session',livekit_url:'wss://test',livekit_client_token:'client-token',livekit_agent_token:'private-agent-token',ws_url:'wss://control'}:null})};}});

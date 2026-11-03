@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import {createStudioMcp} from '../studio-mcp.mjs';
+import {createStudioMcp} from '../src/server/studio-mcp.mjs';
 import {createCanvas} from '@napi-rs/canvas';
 import {zipSync,strToU8} from 'fflate';
 function packageBytes(){const wav=Buffer.alloc(48044);wav.write('RIFF');wav.writeUInt32LE(wav.length-8,4);wav.write('WAVEfmt ',8);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);wav.writeUInt16LE(1,22);wav.writeUInt32LE(24000,24);wav.writeUInt32LE(48000,28);wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);wav.writeUInt32LE(48000,40);return zipSync({'lecture.json':strToU8(JSON.stringify({format:'ultra-lecture',version:1,title:'MCP test',article:'article.md',slides:[{id:'s',title:'Test',image:'s.png'}],segments:[{id:'c',slide:'s',text:'Hello',audio:'a.wav',duration:1}]})),'article.md':strToU8('Test lesson'),'s.png':createCanvas(100,100).toBuffer('image/png'),'a.wav':wav});}

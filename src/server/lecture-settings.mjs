@@ -6,7 +6,7 @@ import {readPackage,packageClassroom,audioDuration,publicationLocks} from './lec
 import {publishedVoiceProfile,voiceProfile} from './reply-voice.mjs';
 import {settings,alignmentData} from './eleven-voice.mjs';
 
-import {avatars} from './avatar-catalog.mjs';
+import {avatars} from '../../public/avatar-catalog.mjs';
 export {avatars};
 const rates={eleven_v4:.08,eleven_v3:.08,eleven_multilingual_v2:.08,eleven_flash_v2_5:.04,eleven_turbo_v2_5:.04,eleven_v4_turbo:.04};
 export function regenerationEstimate(segments,model){

@@ -4,7 +4,7 @@ import {mkdtemp,mkdir,writeFile,readFile,rm,symlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {prepareWorkspace,workspaceFile,runtimeEnvironment,createUltraAgent} from '../ultra-agent.mjs';
+import {prepareWorkspace,workspaceFile,runtimeEnvironment,createUltraAgent} from '../src/server/ultra-agent.mjs';
 import {zipSync,strToU8} from 'fflate';
 const root=fileURLToPath(new URL('..',import.meta.url));
 const manifest={format:'ultra-lecture',version:1,title:'Existing lesson',article:'article.md',slides:[{id:'s1',title:'One',image:'slides/1.png'}],segments:[{id:'c1',slide:'s1',text:'Hello',audio:'audio/1.wav',duration:1}]};

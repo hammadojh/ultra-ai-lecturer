@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {scriptInput,validateScript,scriptMarkdown,fitScriptTiming} from '../scripting.mjs';
+import {scriptInput,validateScript,scriptMarkdown,fitScriptTiming} from '../src/server/scripting.mjs';
 const draft={approved:'yes',title:'Functions',brief:{audience:'Beginners',goals:'Identify inputs',duration:5},sources:[{id:'s1',name:'Source',text:'Double 7 to get 14.'}],plan:{approved:'yes',markdown:'Teach functions, then Q&A.'}};
 draft.plan.input=JSON.stringify({title:draft.title,brief:draft.brief,presentation:draft.presentation,ai:{provider:'local'},sources:draft.sources});
 const segment={title:'Final Q&A',seconds:300,kind:'final_qa',say:'What questions remain?',show:'Summary',actions:'Wait for questions.',sourceIds:['s1']};
@@ -11,8 +11,8 @@ test('Markdown includes cumulative times and say/show/do blocks',()=>{const md=s
 test('fits proposed timing deterministically without dropping segments',()=>{const result=fitScriptTiming({segments:[{...segment,seconds:100},{...segment,seconds:150}]},300);assert.equal(result.segments.reduce((n,s)=>n+s.seconds,0),300);assert.equal(result.segments.length,2);assert.ok(result.segments.every(s=>s.seconds>0));});
 
 test('custom checkpoint time survives script and presenter instructions into playback',async()=>{
- const {scriptSegments,directorMarkdown}=await import('../directing.mjs');
- const {classroomLecture}=await import('../classroom-lecture.mjs');
+ const {scriptSegments,directorMarkdown}=await import('../src/server/directing.mjs');
+ const {classroomLecture}=await import('../public/classroom-lecture.mjs');
  const script={segments:[{...segment,kind:'checkpoint',seconds:180,answerSeconds:95},{...segment,seconds:120}]};
  const parsed=scriptSegments(scriptMarkdown(script,scriptInput(draft)));assert.equal(parsed[0].answerSeconds,95);
  const markdown=directorMarkdown(parsed,parsed.map((s,i)=>({segmentId:s.id,slide:i+1,tone:'calm',energy:'low',pointTo:'',delivery:'Slowly'})));

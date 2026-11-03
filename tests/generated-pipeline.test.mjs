@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {publicationSnapshot} from '../publishing.mjs';import {classroomLecture} from '../classroom-lecture.mjs';import {presentationFingerprint,slidesFingerprint} from '../slides.mjs';import {annotationKey} from '../annotations.mjs';import {voiceFingerprint} from '../voice-authoring.mjs';
+import {publicationSnapshot} from '../src/server/publishing.mjs';import {classroomLecture} from '../public/classroom-lecture.mjs';import {presentationFingerprint,slidesFingerprint} from '../public/slides.mjs';import {annotationKey} from '../public/annotations.mjs';import {voiceFingerprint} from '../public/voice-authoring.mjs';
 function fixture(){
  const d={id:'generated-test',title:'Generated lesson',brief:{audience:'Students',goals:'Understand doubling',duration:5},presentation:{mode:'generated',sourceId:null},sources:[{id:'s',name:'Notes',text:'Seven doubled is fourteen.'}],approved:'yes'};
  d.plan={markdown:'Explain doubling.',approved:'yes',input:JSON.stringify({title:d.title,brief:d.brief,presentation:d.presentation,ai:{provider:'local'},sources:d.sources})};d.script={markdown:'Approved script',approved:'yes',input:JSON.stringify({setup:d.plan.input,plan:d.plan.markdown})};d.assets={items:[],approved:'yes'};

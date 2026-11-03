@@ -1,7 +1,7 @@
 import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import {mkdir,readFile,writeFile,rename,chmod} from 'node:fs/promises';
 import {createRemoteJWKSet,jwtVerify} from 'jose';
-const directory=new URL('./.cache/chatgpt/',import.meta.url),file=new URL('connection.json',directory);
+const directory=new URL('../../.cache/chatgpt/',import.meta.url),file=new URL('connection.json',directory);
 const issuer='https://auth.openai.com',resource='https://api.openai.com/v1';
 const redirect='http://127.0.0.1:4173/auth/chatgpt/callback';
 const jwks=createRemoteJWKSet(new URL(issuer+'/.well-known/jwks.json'));

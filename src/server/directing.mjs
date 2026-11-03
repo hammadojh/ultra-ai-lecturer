@@ -1,4 +1,4 @@
-import {slidesReady,presentationFingerprint} from './slides.mjs';
+import {slidesReady,presentationFingerprint} from '../../public/slides.mjs';
 import {scriptInput} from './scripting.mjs';
 import {generateStructured} from './planning.mjs';
 export function scriptSegments(markdown){

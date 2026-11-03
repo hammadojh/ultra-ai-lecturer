@@ -1,7 +1,7 @@
 import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import path from 'node:path';
-import {avatars} from './avatar-catalog.mjs';
+import {avatars} from '../../public/avatar-catalog.mjs';
 export function createSimliApi({root,request=fetch}){
  const pending=new Map(),starting=new Set();
  const directory=path.join(root,'.cache/simli/videos');

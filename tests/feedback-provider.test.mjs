@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {generateFeedback} from '../feedback.mjs';
+import {generateFeedback} from '../src/server/feedback.mjs';
 const batch=[{id:'m1',kind:'answer',text:'14'}];
 test('live feedback uses ChatGPT with grounded instructions, history and truthful metadata',async()=>{
  const signal=new AbortController().signal;
@@ -23,7 +23,7 @@ test('ChatGPT output still requires complete message coverage',async()=>{
 });
 
 test('immediate facilitator feedback accepts a real narration segment without forcing a practice question',async()=>{
- const {lecture}=await import('../lecture.mjs');const id=lecture.segments[0].id;
+ const {lecture}=await import('../public/lecture.mjs');const id=lecture.segments[0].id;
  await assert.rejects(generateFeedback(batch,[],undefined,id),/Invalid checkpoint/);
  const result=await generateFeedback([{id:'m1',kind:'question',text:'What is an input?'}],[],undefined,id,null,async req=>{
   assert.match(req.instructions,/facilitator has invited an immediate raised-hand question/);

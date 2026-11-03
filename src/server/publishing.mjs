@@ -1,8 +1,8 @@
-import {slidesReady} from './slides.mjs';
+import {slidesReady} from '../../public/slides.mjs';
 import {scriptInput} from './scripting.mjs';
 import {directorFingerprint} from './directing.mjs';
-import {voiceReady} from './voice-authoring.mjs';
-import {annotationKey} from './annotations.mjs';
+import {voiceReady} from '../../public/voice-authoring.mjs';
+import {annotationKey} from '../../public/annotations.mjs';
 export function publicationSnapshot(d){
  scriptInput(d);
  if(d.presentation?.mode!=='original'&&!slidesReady(d))throw Error('Approve the current generated slides before publishing.');

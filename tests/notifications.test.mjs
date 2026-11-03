@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {startNotificationTask} from '../notifications.mjs';
+import {startNotificationTask} from '../public/notifications.mjs';
 test('long tasks notify once; quick tasks, cancellations and opt-outs stay quiet',()=>{
  const oldNow=Date.now;let now=0,on=true;const calls=[];
  globalThis.window={Notification:true};globalThis.localStorage={getItem:()=>on?'on':'off'};globalThis.Notification=class {static permission='granted';constructor(title){calls.push(title);}};Date.now=()=>now;
