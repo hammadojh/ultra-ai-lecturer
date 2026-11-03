@@ -21,3 +21,14 @@ test('ChatGPT failures propagate without a silent local fallback',async()=>{
 test('ChatGPT output still requires complete message coverage',async()=>{
  await assert.rejects(generateFeedback(batch,[],undefined,'question',null,async()=>JSON.stringify({text:'Omar, correct.',addressedIds:[],deferredIds:[]})),/Invalid message coverage/);
 });
+
+test('immediate facilitator feedback accepts a real narration segment without forcing a practice question',async()=>{
+ const {lecture}=await import('../lecture.mjs');const id=lecture.segments[0].id;
+ await assert.rejects(generateFeedback(batch,[],undefined,id),/Invalid checkpoint/);
+ const result=await generateFeedback([{id:'m1',kind:'question',text:'What is an input?'}],[],undefined,id,null,async req=>{
+  assert.match(req.instructions,/facilitator has invited an immediate raised-hand question/);
+  assert.doesNotMatch(req.instructions,/explicitly compare it with fourteen/);
+  return JSON.stringify({text:'Omar, an input is the value you give to the function.',addressedIds:['m1'],deferredIds:[]});
+ },'Omar',undefined,true);assert.deepEqual(result.addressedIds,['m1']);
+ await assert.rejects(generateFeedback(batch,[],undefined,'invented',null,undefined,'Omar',undefined,true),/Invalid checkpoint/);
+});

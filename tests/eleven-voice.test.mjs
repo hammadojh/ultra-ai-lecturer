@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {alignmentData} from '../eleven-voice.mjs';
+test('ElevenLabs character timings become caption word timings in milliseconds',()=>{assert.deepEqual(alignmentData({characters:['H','i',' ','O','m','a','r'],characterStartTimesSeconds:[0,.1,.2,.3,.4,.5,.6],characterEndTimesSeconds:[.1,.2,.3,.4,.5,.6,.7]}),{words:['Hi','Omar'],wtimes:[0,300],wdurations:[200,399.99999999999994]});assert.throws(()=>alignmentData(null));});

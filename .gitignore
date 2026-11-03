@@ -3,3 +3,5 @@ output/
 .playwright-cli/
 node_modules/
 .cache/
+
+.playwright-mcp/

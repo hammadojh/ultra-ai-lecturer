@@ -1,9 +1,11 @@
+import {splitFingerprint,sourceUnits,splitSources,validateSplit} from './lecture-splitting.mjs';
 import {readAuthoringDrafts} from './annotations.mjs';
 import {presentationFingerprint,slidesFingerprint,slidesReady,approvedVisuals,deckHTML} from './slides.mjs';
 let slidesJob=null;
 import {startNotificationTask} from './notifications.mjs';
 import {narrationClips,voiceFingerprint,voiceReady} from './voice-authoring.mjs';
 const visualJobs=new Map();
+const slidePreviewObservers=[];
 let voiceJob=null;
 let directionJob=null;
 import {sourceAssets,assetFingerprint,assetsReady} from './assets-client.mjs';
@@ -58,7 +60,7 @@ $('source-file').onchange=async()=>{
  const token=++importToken,draftId=selected,status=$('extraction-status');status.hidden=false;
  if(!/\.(txt|md|pdf|pptx)$/i.test(file.name)||file.size>15*1024*1024){status.textContent='Choose TXT, Markdown, PDF or PPTX up to 15 MB. Save older .ppt files as .pptx.';return;}
  $('upload-next').disabled=true;$('source-file').disabled=true;$('source-form').querySelector('button[type=submit]').disabled=true;
- status.textContent='Extracting '+file.name+'…';
+ status.classList.add('is-loading');status.textContent='Extracting '+file.name+'…';
  try{
   let extracted;
   if(/\.(pdf|pptx)$/i.test(file.name)){
@@ -80,7 +82,7 @@ $('source-file').onchange=async()=>{
 
   status.textContent=(extracted.sections.length?extracted.sections.length+' pages/slides extracted. ':'Text loaded. ')+extracted.warnings.join(' ')+ ' '+(extracted.assets||[]).filter(a=>a.kind==='image').length+' reusable images; '+(extracted.assets||[]).filter(a=>a.kind==='page').length+' page previews. Review the text and visuals before saving.';
  }catch(error){if(token===importToken)status.textContent=error.name==='TimeoutError'?'Extraction timed out. Try a smaller file.':error.message;}
- finally{if(token===importToken){$('source-file').disabled=false;$('source-form').querySelector('button[type=submit]').disabled=false;$('source-file').value='';renderWorkflow();}}
+ finally{status.classList.remove('is-loading');if(token===importToken){$('source-file').disabled=false;$('source-form').querySelector('button[type=submit]').disabled=false;$('source-file').value='';renderWorkflow();}}
 };
 $('source-form').onsubmit=e=>{
  e.preventDefault();const d=current(),text=$('source-text').value.trim(),name=$('source-name').value.trim();if(!text||!name)return;
@@ -109,8 +111,10 @@ function go(step){
 function planFingerprint(d){return JSON.stringify({title:d.title,brief:d.brief,presentation:d.presentation,ai:d.ai||{provider:'local'},sources:d.sources.map(({id,name,text})=>({id,name,text}))});}
 function renderPlan(){
  const d=current();if(!d)return;renderModelChoice();const busy=planJob?.id===d.id,stale=d.plan&&d.plan.input!==planFingerprint(d);
- $('generate-plan').disabled=!!planJob||!!scriptJob||!d.approved||(d.ai?.provider==='chatgpt'&&(!chatgptConnection.enabled||!chatgptModels.some(m=>m.id===d.ai.model)))||(d.ai?.provider==='openrouter'&&(!openrouterConnection.connected||!openrouterModels.some(m=>m.id===d.ai.model)));$('generate-plan').textContent=d.plan?'Regenerate plan':'Generate lecture plan';
+ $('generate-plan').disabled=!!planJob||!!scriptJob||!d.approved||(d.ai?.provider==='chatgpt'&&(!chatgptConnection.enabled||!chatgptModels.some(m=>m.id===d.ai.model)))||(d.ai?.provider==='openrouter'&&(!openrouterConnection.connected||!openrouterModels.some(m=>m.id===d.ai.model)));$('generate-plan').textContent=d.sources.reduce((n,s)=>n+s.text.length,0)>50000?'Suggest lecture split with AI':d.plan?'Regenerate plan':'Generate lecture plan';
+ renderSplitReview(d);
  $('cancel-plan').hidden=!busy;$('generated-plan').hidden=!d.plan;
+ $('generation-status').classList.toggle('is-loading',busy);
  $('generation-status').textContent=busy?'Thinking… building your lecture plan from the confirmed sources. This can take a few minutes.':stale?'Sources or details changed. Confirm setup and regenerate before approving this plan.':d.plan?'Generated with '+d.plan.model+'. Review facts, timing and examples.':d.ai?.provider==='openrouter'?'Choose an OpenRouter model. Generation uses your OpenRouter credits.':d.ai?.provider==='chatgpt'?'Connect your ChatGPT plan and choose an available model.':'Ready to generate using the local AI model.';
  if(d.plan)$('plan-markdown').value=d.plan.markdown;
  $('plan-markdown').disabled=busy;
@@ -127,7 +131,7 @@ function renderWorkflow(){
  $('slides-stage').hidden=step!==10;$('source-stage').hidden=step!==2;$('details-stage').hidden=step!==3;$('review-stage').hidden=step!==4;$('ready-stage').hidden=step!==5;$('script-stage').hidden=step!==6;$('assets-stage').hidden=step!==7;$('original-ready-stage').hidden=step!==8;$('voice-stage').hidden=step!==9;
  $('original-ready-status').textContent=scriptReady(d)?'Script approved. Ready for detailed presentation instructions.':'Return to the script and approve its current version first.';
  const titles={10:'Create your lecture slides.',9:'Prepare the lecturer voice.',8:'Direct the AI presenter.',7:'Prepare your lecture visuals.',2:'Upload your material.',3:'Fill in the lecture details.',4:'Review your lecture.',6:'Write the presentation script.',5:'Build your lecture plan.'};
- const descriptions={10:'Generate from your approved script and visuals. Review and edit each slide before approving.',9:'Sample the narration, then approve the voice set. Individual clip reviews are optional.',8:'Add timing, delivery and pointing cues to your approved slides.',7:'Approve the asset plan, then create diagrams or find images and review each visual.',2:'Add one or more sources. Text and visuals are extracted automatically.',3:'We filled in starting defaults. Adjust them to suit your students.',4:'Check the material and details, then confirm to move on.',6:'Review the timing, exact narration, slide content and presenter actions before approving.',5:'Generate from your confirmed material, review the plan, then approve it.'};
+ const descriptions={10:'Generate from your approved script and visuals. Review and edit each slide before approving.',9:'Sample the narration, then approve the voice set. Individual clip reviews are optional.',8:'Add timing, delivery and pointing cues to your approved slides.',7:'Describe the essential visuals, then approve the descriptions. Visuals are created alongside the HTML slides.',2:'Add one or more sources. Text and visuals are extracted automatically.',3:'We filled in starting defaults. Adjust them to suit your students.',4:'Check the material and details, then confirm to move on.',6:'Review the timing, exact narration, slide content and presenter actions before approving.',5:'Generate from your confirmed material, review the plan, then approve it.'};
  $('step-kicker').textContent=step>=5?'AUTHORING · '+(step===10?'HTML SLIDES':step===5?'LECTURE PLAN':step===6?'PRESENTATION SCRIPT':step===8?'PRESENTER INSTRUCTIONS':step===9?'VOICE':'ASSETS'):'Lecture setup';
  $('step-title').textContent=titles[step];$('step-description').textContent=descriptions[step];
  document.querySelectorAll('.wizard-steps li').forEach((li,i)=>{li.classList.toggle('complete',i+1<step);if(i+1===Math.min(step,4))li.setAttribute('aria-current','step');else li.removeAttribute('aria-current');});
@@ -169,6 +173,7 @@ $('undo-delete').onclick=()=>{if(!undoState)return;if(undoState.kind==='lecture'
  else{const d=drafts.find(d=>d.id===undoState.draftId);if(d){d.sources.splice(undoState.index,0,undoState.source);d.approved=null;if(d.plan)d.plan.approved=null;selected=d.id;}}undoState=null;$('undo-delete').hidden=true;clearImport();save();render();};
 $('generate-plan').onclick=async()=>{
  const d=current();if(!d.approved||planJob||scriptJob)return;
+ if(d.sources.reduce((n,s)=>n+s.text.length,0)>50000){await suggestLectureSplit(d);return;}
  const input=planFingerprint(d),controller=new AbortController();planJob={id:d.id,controller};renderPlan();
  const notify=startNotificationTask('Lecture plan');
  try{
@@ -256,6 +261,7 @@ function renderScript(){
  if(d.script)$('script-markdown').value=d.script.markdown;
  $('script-markdown').disabled=busy;
  $('approve-script').disabled=busy||!valid||!d.script||stale||!d.script.markdown.trim()||!!d.script.approved;
+ $('script-status').classList.toggle('is-loading',busy);
  $('script-status').textContent=busy?'Thinking… writing the timed script. This may take a few minutes.':!valid?'Return to the lecture plan and approve its current version first.':stale?'The plan or sources changed. Regenerate this script.':d.script?'Generated with '+d.script.model+'. Review narration, timing and source accuracy.':'Ready to write using your selected planning provider and approved plan.';
  $('next-assets').disabled=!scriptReady(d)||!!scriptJob;
  const original=d.presentation?.mode==='original';
@@ -285,55 +291,17 @@ $('approve-script').onclick=()=>{const d=current();if(!planReady(d)||scriptJob||
 $('download-script').onclick=()=>{const url=URL.createObjectURL(new Blob([current().script.markdown],{type:'text/markdown'})),a=document.createElement('a');a.href=url;a.download='presentation-script.md';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 
 function scriptReady(d){return planReady(d)&&!!d.script?.approved&&d.script.input===scriptFingerprint(d);}
-async function createVisual(d,item,mode){
- if(visualJobs.has(item))return;
- const controller=new AbortController(),brief=item.brief;visualJobs.set(item,controller);item.productionError=null;renderAssets();
- const notify=startNotificationTask(mode==='find'?'Image search':'Visual generation');
- try{const r=await fetch('/api/asset-production',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({ai:d.ai,item:{title:item.title,brief:item.brief,purpose:item.purpose},mode})});const data=await r.json();if(!r.ok)throw Error(data.error||'Could not prepare this visual.');if(!drafts.includes(d)||!d.assets.items.includes(item)||brief!==item.brief)throw Error('The brief changed. Retry with the updated plan.');item.candidates=data.candidates;item.searchQuery=data.query;item.productionError=data.candidates.length?'':'No matching images found. Edit the brief, generate a diagram, or upload an image.';save();notify();}
- catch(e){if(e.name!=='AbortError'){item.productionError=e.message;notify(e);}save();}
- finally{visualJobs.delete(item);if(current()?.id===d.id)renderAssets();}
-}
 function renderAssets(){
  const d=current();if(!d)return;const valid=scriptReady(d),stale=d.assets&&d.assets.input!==assetFingerprint(d),busy=assetJob?.id===d.id;
  $('generate-assets').disabled=!valid||!!assetJob||!!scriptJob||!!planJob;$('cancel-assets').hidden=!busy;
- $('assets-status').textContent=busy?'Thinking… matching visual requirements to source material.':!valid?'Approve the current script first.':stale?'The script or source visuals changed. Prepare the checklist again.':d.assets?(d.assets.planApproved?'Create or find visuals below, then confirm each selection.':'Review and edit the briefs, then approve the plan to continue.'):'Prepare a checklist from your approved script.';
- const production=!!d.assets?.planApproved;
- const phase=$('asset-phase-controls');phase.replaceChildren();
- if(d.assets&&!stale){const heading=document.createElement('h3');heading.textContent=production?'2. Create & find assets':'1. Review the asset plan';const action=document.createElement('button');action.className='primary';action.textContent=production?'Back to asset plan':'Approve plan → Create & find assets';action.disabled=busy||!valid||visualJobs.size>0||d.assets.items.some(i=>!i.brief.trim());action.onclick=()=>{d.assets.planApproved=production?null:new Date().toISOString();save();renderAssets();};phase.append(heading,action);}
- $('asset-production-progress').textContent=production?`${d.assets.items.filter(i=>i.status==='reviewed').length} of ${d.assets.items.length} visuals reviewed · ${visualJobs.size} processing`:'';
- $('approve-assets').hidden=!production;$('download-assets').hidden=!production;
- const available=sourceAssets(d);showAssets($('source-visuals'),available);$('asset-checklist').replaceChildren();
- for(const item of d.assets?.items||[]){
-  const card=document.createElement('article');card.className='asset-review-card';
-  const title=document.createElement('h4');title.textContent=item.title;
-  const context=document.createElement('p');context.textContent=item.scriptLocation+' · '+item.purpose;
-  const brief=document.createElement('textarea');brief.value=item.brief;brief.setAttribute('aria-label','Visual brief: '+item.title);brief.rows=3;brief.disabled=production;brief.oninput=()=>{item.brief=brief.value;item.status='pending';d.assets.approved=null;save();$('approve-assets').disabled=true;};brief.onchange=()=>renderAssets();
-  const label=document.createElement('label');label.textContent='Visual for '+item.title;
-  const select=document.createElement('select');select.setAttribute('aria-label',label.textContent);
-  for(const a of [{id:'',label:'Choose a source visual or upload'},{id:'text-only',label:'Use text only — no visual needed'},...available.map(a=>({id:a.id,label:a.sourceName+' · '+a.label}))]){const o=document.createElement('option');o.value=a.id;o.textContent=a.label;select.append(o);}
-  if(item.upload){const o=document.createElement('option');o.value='upload';o.textContent=item.upload.name;select.append(o);}
-  select.value=item.assetId;select.onchange=()=>{item.assetId=select.value;item.status='pending';d.assets.approved=null;save();renderAssets();};
-  const upload=document.createElement('input');upload.type='file';upload.accept='image/png,image/jpeg,image/webp,image/gif';upload.setAttribute('aria-label','Upload visual for '+item.title);
-  upload.onchange=async()=>{const file=upload.files[0];if(!file)return;if(!['image/png','image/jpeg','image/webp','image/gif'].includes(file.type)||file.size>1500000){$('assets-status').textContent='Choose PNG, JPEG, WebP or GIF up to 1.5 MB.';return;}
-   const reader=new FileReader();reader.onload=()=>{if(!drafts.includes(d))return;item.upload={name:file.name,url:reader.result};item.assetId='upload';item.status='pending';d.assets.approved=null;save();renderAssets();};reader.readAsDataURL(file);
-  };
-  const chosen=item.assetId==='upload'?item.upload:available.find(a=>a.id===item.assetId);
-  const approve=document.createElement('button');approve.className='control';approve.textContent=item.status==='reviewed'?'✓ Reviewed':'Confirm this visual';approve.disabled=visualJobs.has(item)||busy||stale||!valid||!item.brief.trim()||(!chosen&&item.assetId!=='text-only');approve.onclick=()=>{item.status='reviewed';d.assets.approved=null;save();renderAssets();};
-  card.append(title,context,brief);
-  if(!production){$('asset-checklist').append(card);continue;}
-  const actions=document.createElement('div');actions.className='plan-actions';
-  for(const [mode,text] of [['generate','Generate AI diagram'],['find','Find images with AI']]){const b=document.createElement('button');b.className='control';b.textContent=text;b.disabled=visualJobs.has(item)||stale||!valid;b.onclick=()=>createVisual(d,item,mode);actions.append(b);}
-  const state=document.createElement('p');state.setAttribute('role','status');state.textContent=visualJobs.has(item)?'Working… your result will be saved here.':item.productionError|| (item.status==='reviewed'?'Reviewed':chosen?'Visual selected · review below':'Choose how to create this visual.');
-  if(visualJobs.has(item)){const cancel=document.createElement('button');cancel.className='control';cancel.textContent='Cancel';cancel.onclick=()=>visualJobs.get(item)?.abort();actions.append(cancel);}
-  card.append(actions,state);
-  const candidates=document.createElement('div');candidates.className='asset-candidates';
-  for(const candidate of item.candidates||[]){const option=document.createElement('article');const image=document.createElement('img');image.src=candidate.url;image.alt=candidate.description||candidate.name;image.loading='lazy';const caption=document.createElement('p');caption.textContent=[candidate.name,candidate.provenance,candidate.credit,candidate.license].filter(Boolean).join(' · ');const use=document.createElement('button');use.className='control';use.textContent='Use this visual';use.onclick=()=>{item.upload={...candidate};item.assetId='upload';item.status='pending';d.assets.approved=null;save();renderAssets();};option.append(image,caption);if(candidate.sourceUrl){const source=document.createElement('a');source.href=candidate.sourceUrl;source.target='_blank';source.rel='noopener noreferrer';source.textContent='View source & license ↗';option.append(source);}option.append(use);candidates.append(option);}
-  card.append(candidates,label,select,upload);if(chosen){const img=document.createElement('img');img.src=chosen.url;img.alt=item.title;img.className='asset-preview';card.append(img);}card.append(approve);$('asset-checklist').append(card);
- }
- if(d.assets&&!d.assets.items.length){const p=document.createElement('p');p.textContent='No separate visuals were requested. Review the script before approving a text-only asset set.';$('asset-checklist').append(p);}
- $('approve-assets').disabled=visualJobs.size>0||!valid||busy||!assetsReady(d)||!!d.assets?.approved;$('download-assets').disabled=!d.assets;
- $('next-slides').hidden=!(valid&&assetsReady(d)&&d.assets?.approved);
- $('assets-approval').textContent=valid&&assetsReady(d)&&d.assets.approved?'Asset set approved. Ready for HTML slides.':'';
+ $('assets-status').classList.toggle('is-loading',busy);$('assets-status').textContent=busy?'Thinking… planning essential visuals.':stale?'Source material changed. Regenerate the descriptions.':'Review the visual descriptions. Images and diagrams will be prepared inside the HTML slides step.';
+ $('source-visuals').replaceChildren();$('asset-phase-controls').replaceChildren();$('asset-production-progress').textContent=d.assets?`${d.assets.items.filter(i=>i.status==='reviewed').length} of ${d.assets.items.length} descriptions reviewed`:'';
+ $('asset-checklist').replaceChildren();
+ for(const item of d.assets?.items||[]){const card=document.createElement('article');card.className='asset-review-card';const title=document.createElement('h4');title.textContent=item.title;const context=document.createElement('p');context.textContent=item.scriptLocation+' · '+item.purpose;const brief=document.createElement('textarea');brief.value=item.brief;brief.rows=3;brief.setAttribute('aria-label','Asset description: '+item.title);brief.disabled=busy;
+ brief.oninput=()=>{item.brief=brief.value;item.status='pending';d.assets.approved=null;save();$('approve-assets').disabled=true;$('next-slides').hidden=true;};
+ const review=document.createElement('button');review.className='control';review.textContent=item.status==='reviewed'?'✓ Description reviewed':'Keep description';review.disabled=busy||stale||!valid;review.onclick=()=>{if(!item.brief.trim())return;item.status='reviewed';d.assets.approved=null;save();renderAssets();};card.append(title,context,brief,review);$('asset-checklist').append(card);}
+ $('approve-assets').hidden=false;$('approve-assets').textContent='Approve asset descriptions';$('approve-assets').disabled=!valid||busy||!assetsReady(d)||!!d.assets?.approved;$('download-assets').hidden=false;$('download-assets').disabled=!d.assets;
+ $('assets-approval').textContent=d.assets?.approved&&assetsReady(d)?'Descriptions approved. Create and review the visuals with your slides.':'';$('next-slides').hidden=!(valid&&assetsReady(d)&&d.assets?.approved);
 }
 $('next-assets').onclick=()=>{if(scriptReady(current()))go(current().presentation?.mode==='original'?8:7);};$('back-script').onclick=()=>go(6);
 $('generate-assets').onclick=async()=>{
@@ -353,6 +321,7 @@ function renderDirection(){
  const d=current();if(!d)return;const busy=directionJob?.id===d.id,valid=scriptReady(d)&&(d.presentation?.mode==='original'||slidesReady(d)),stale=d.direction&&d.direction.input!==directionFingerprint(d);
  $('generate-direction').disabled=!valid||!!directionJob||!!scriptJob||!!planJob;$('cancel-direction').hidden=!busy;$('generated-direction').hidden=!d.direction;
  if(d.direction)$('direction-markdown').value=d.direction.markdown;$('direction-markdown').disabled=busy;
+ $('direction-status').classList.toggle('is-loading',busy);
  $('direction-status').textContent=busy?'Thinking… mapping the script to your slides and adding delivery cues.':!valid?'Approve the current script first.':stale?'The script or original slides changed. Regenerate instructions.':d.direction?'Generated with '+d.direction.model+'. Review slide references, pointing suggestions and delivery.':'Your approved slides stay unchanged. Narration is copied from the approved script.';
  $('approve-direction').disabled=!valid||busy||!d.direction||stale||!d.direction.markdown.trim()||!!d.direction.approved;
  $('next-voice').disabled=!directionReady(d)||!!directionJob;
@@ -379,6 +348,7 @@ function renderVoice(){
  $('voice-review-count').textContent=total?reviewed+' of '+total+' reviewed (optional)':'';
  $('prepare-voice').disabled=!valid||!!voiceJob||complete;$('stop-voice').hidden=!busy;
  $('prepare-voice').textContent=complete?'✓ All clips generated':busy?'Generating…':d.voice&&!stale?'Resume missing clips':'Prepare voice clips';
+ $('voice-build-status').classList.toggle('is-loading',busy);
  $('voice-build-status').textContent=busy?'Preparing clip '+voiceJob.position+' of '+d.voice.clips.length+'…':!valid?'Approve the current presenter instructions first.':stale?'Presenter instructions changed. Prepare the voice set again.':d.voice?d.voice.clips.filter(c=>c.url).length+' of '+d.voice.clips.length+' clips ready. Sample any clips, then approve the whole set. Individual review is optional.':'Ready to generate short clips from the approved narration.';
  const openClips=new Set([...$('voice-clips').querySelectorAll('details[open]')].map(el=>el.dataset.clip));$('voice-clips').replaceChildren();
  for(const clip of d.voice?.clips||[]){const card=document.createElement('details');card.className='asset-review-card voice-clip-row';card.dataset.clip=clip.id;card.open=openClips.has(clip.id);const title=document.createElement('summary');title.textContent='Clip '+clip.id.replace('clip-','')+' · Script section '+clip.section;const text=document.createElement('p');text.textContent=clip.text;card.append(title,text);const status=document.createElement('span');status.className='clip-status';const active=busy&&voiceJob.position===d.voice.clips.indexOf(clip)+1&&!clip.url;status.textContent=stale?'Outdated':clip.url?(clip.reviewed?'✓ Reviewed':'✓ Generated'):active?'Generating…':clip.error?'Failed · retry available':'Queued';const progress=document.createElement('progress');progress.max=1;progress.setAttribute('aria-label','Progress for '+clip.id);if(!active)progress.value=clip.url?1:0;title.append(status);card.append(progress);
@@ -395,7 +365,7 @@ $('prepare-voice').onclick=async()=>{
  for(const [i,clip] of d.voice.clips.entries()){
   if(voiceJob.stop||!drafts.includes(d)||!directionReady(d)||voiceFingerprint(d)!==input)break;if(clip.url)continue;
   voiceJob.position=i+1;if(current()?.id===d.id)renderVoice();
-  try{const response=await fetch('/api/authoring-speech',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:clip.text}),signal:AbortSignal.timeout(190000)});if(!response.ok)throw Error('Voice preparation failed. Retry this set.');const result=await response.json();clip.url=result.url;clip.error=null;save();}
+  try{const response=await fetch('/api/authoring-speech',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:clip.text}),signal:AbortSignal.timeout(190000)});if(!response.ok)throw Error('Voice preparation failed. Retry this set.');const result=await response.json();clip.url=result.url;clip.voiceProfile=result.voiceProfile;clip.error=null;save();}
   catch(error){notify(error);clip.error=error.message;save();break;}
  }
  }catch(error){notify(error);$('voice-build-status').textContent=error.message;voiceJob=null;return;}
@@ -426,12 +396,12 @@ function studioSteps(d){
   ...(original?[
    {step:8,label:'Presenter instructions',done:directionReady(d),enabled:scriptReady(d),hint:'Delivery and slide cues'},
    {step:9,label:'Voice',done:directionReady(d)&&voiceReady(d)&&!!d.voice?.approved,enabled:directionReady(d),hint:'Generate and listen'},
-   {label:'Annotations & publish',done:!!d.annotationsApproved,enabled:directionReady(d)&&voiceReady(d)&&!!d.voice?.approved,href:'/annotation-review.html?lecture='+encodeURIComponent(d.id),hint:'Review, rehearse, publish'}
+   {label:'Annotations & publish',done:!!d.annotationsSkipped||!!d.annotationsApproved,enabled:directionReady(d)&&voiceReady(d)&&!!d.voice?.approved,href:'/annotation-review.html?lecture='+encodeURIComponent(d.id),hint:'Review, rehearse, publish'}
   ]:[{step:7,label:'Visual assets',done:scriptReady(d)&&assetsReady(d)&&!!d.assets?.approved,enabled:scriptReady(d),hint:'Match and review visuals'},
       {step:10,label:'HTML slides',done:slidesReady(d),enabled:scriptReady(d)&&assetsReady(d)&&!!d.assets?.approved,hint:'Generate, edit and review'},
  {step:8,label:'Presenter instructions',done:directionReady(d),enabled:slidesReady(d)&&scriptReady(d),hint:'Delivery and slide cues'},
  {step:9,label:'Voice',done:directionReady(d)&&voiceReady(d)&&!!d.voice?.approved,enabled:directionReady(d),hint:'Generate and listen'},
- {label:'Annotations & publish',done:!!d.annotationsApproved,enabled:directionReady(d)&&voiceReady(d)&&!!d.voice?.approved,href:'/annotation-review.html?lecture='+encodeURIComponent(d.id),hint:'Review, rehearse, publish'}])
+ {label:'Annotations & publish',done:!!d.annotationsSkipped||!!d.annotationsApproved,enabled:directionReady(d)&&voiceReady(d)&&!!d.voice?.approved,href:'/annotation-review.html?lecture='+encodeURIComponent(d.id),hint:'Review, rehearse, publish'}])
  ];
 }
 function refreshStudioChrome(){
@@ -489,26 +459,83 @@ refreshStudioChrome();
 
 const studioNarrow=matchMedia('(max-width:720px)');$('lecture-library').open=!studioNarrow.matches;studioNarrow.addEventListener('change',e=>{$('lecture-library').open=!e.matches;});
 
+async function prepareSlideVisual(d,slide,mode='generate',parentSignal){
+ if(visualJobs.has(slide))return;const controller=new AbortController();visualJobs.set(slide,controller);slide.visualError=null;slide.reviewed=false;slide.assetKept=false;d.slides.approved=null;save();const brief=slide.visualBrief;renderSlides();const notify=startNotificationTask('Slide visual');
+ try{const r=await fetch('/api/asset-production',{method:'POST',headers:{'Content-Type':'application/json'},signal:parentSignal?AbortSignal.any([parentSignal,controller.signal]):controller.signal,body:JSON.stringify({ai:d.ai,mode,item:{title:slide.title,brief,purpose:d.assets.items.find(a=>a.id===(slide.requirementId||slide.assetId))?.purpose||slide.title}})}),data=await r.json();if(!r.ok)throw Error(data.error||'Visual generation failed.');if(!drafts.includes(d)||!d.slides.items.includes(slide)||brief!==slide.visualBrief)return;
+ slide.candidates=data.candidates;if(!data.candidates.length)throw Error('No image found. Adjust the description or generate a diagram.');if(mode==='generate')slide.visual=data.candidates[0];slide.assetKept=false;slide.reviewed=false;d.slides.approved=null;save();notify();
+ }catch(e){if(e.name!=='AbortError'){slide.visualError=e.message;notify(e);}save();}finally{visualJobs.delete(slide);if(current()?.id===d.id)renderSlides();}
+}
+function slidePreviewHTML(slide,d){return deckHTML([slide],approvedVisuals(d)).replace('</style>','body{width:1200px;height:675px;overflow:hidden}.slide{width:1200px;margin:0}</style>');}
 function renderSlides(){
  const d=current();if(!d)return;const ready=scriptReady(d)&&assetsReady(d)&&!!d.assets?.approved,stale=d.slides&&d.slides.input!==slidesFingerprint(d),busy=slidesJob?.id===d.id;
- $('generate-slides').disabled=!ready||!!slidesJob;$('cancel-slides').hidden=!busy;
- $('slides-status').textContent=busy?'Thinking… composing your slides.':!ready?'Approve the current script and assets first.':stale?'Script or assets changed. Generate the deck again.':slidesReady(d)?'Slide deck approved. Continue to presenter instructions.':d.slides?`${d.slides.items.filter(s=>s.reviewed).length} of ${d.slides.items.length} slides reviewed`:'Ready to generate slides from your approved script and visuals.';
- $('next-presenter').hidden=!ready||!slidesReady(d)||busy;
- $('slides-list').replaceChildren();
+ $('deck-comment').value=d.deckComment||'';$('deck-comment').disabled=busy;$('revise-deck').disabled=!ready||stale||busy||visualJobs.size>0||!d.slides;
+ $('generate-slides').disabled=!ready||!!slidesJob||visualJobs.size>0;$('cancel-slides').hidden=!busy;
+ $('slides-status').classList.toggle('is-loading',busy||visualJobs.size>0);
+ $('slides-status').textContent=busy?'Preparing slides and their visuals…':!ready?'Approve the script and asset descriptions first.':stale?'Script or descriptions changed. Generate the deck again.':slidesReady(d)?'Slide deck approved. Continue to presenter instructions.':d.slides?`${d.slides.items.filter(s=>s.reviewed).length} of ${d.slides.items.length} slides reviewed · ${visualJobs.size} visuals processing`:'Create minimal slides and their visuals from the approved descriptions.';
+ $('slides-list').className=d.slideView==='rows'?'slides-rows':'slides-grid';
+ for(const mode of ['grid','rows']){$('slides-'+mode).setAttribute('aria-pressed',String((d.slideView||'grid')===mode));$('slides-'+mode).onclick=()=>{d.slideView=mode;save();renderSlides();};}
+ $('approve-all-slides').disabled=!ready||stale||busy||visualJobs.size>0||!d.slides?.items.length||d.slides.items.some(s=>s.assetId&&!s.visual?.url);
+ $('next-presenter').hidden=!ready||!slidesReady(d)||busy;slidePreviewObservers.splice(0).forEach(o=>o.disconnect());$('slides-list').replaceChildren();
  for(const [i,slide] of (d.slides?.items||[]).entries()){
- const card=document.createElement('details');card.open=i===0;const summary=document.createElement('summary');summary.textContent=`${i+1}. ${slide.title} · ${slide.reviewed?'Reviewed':'Needs review'}`;
- const frame=document.createElement('iframe');frame.title='Slide '+(i+1);frame.sandbox='';frame.style.cssText='width:100%;height:450px;border:1px solid #dce3f0;border-radius:12px';frame.srcdoc=deckHTML([slide],approvedVisuals(d));
- const title=document.createElement('input');title.value=slide.title;title.maxLength=160;title.setAttribute('aria-label','Title for slide '+(i+1));
- const bullets=document.createElement('textarea');bullets.value=slide.bullets.join('\n');bullets.rows=5;bullets.setAttribute('aria-label','One bullet per line for slide '+(i+1));
- const edit=()=>{slide.title=title.value;slide.bullets=bullets.value.split('\n').filter(Boolean);slide.reviewed=false;d.slides.approved=null;save();frame.srcdoc=deckHTML([slide],approvedVisuals(d));review.textContent='Confirm slide';summary.textContent=`${i+1}. ${slide.title} · Needs review`;};title.oninput=edit;bullets.oninput=edit;
- const review=document.createElement('button');review.className='control';review.textContent=slide.reviewed?'✓ Reviewed':'Confirm slide';review.disabled=busy||stale||!ready;review.onclick=()=>{if(!slide.title.trim()||slide.bullets.length>6||slide.bullets.some(b=>b.length>300)){$('slides-status').textContent='Use a title and up to six bullets, each no longer than 300 characters.';return;}slide.reviewed=true;save();renderSlides();};card.append(summary,frame,title,bullets,review);$('slides-list').append(card);
+ if(d.slides.version!==2&&slide.assetId&&!slide.visual)slide.visual=approvedVisuals(d).find(v=>v.id===slide.assetId);
+ const card=document.createElement('article');card.className='slide-review-card';const summary=document.createElement('h3');summary.textContent=`${i+1}. ${slide.title} · ${slide.reviewed?'Reviewed':'Needs review'}`;
+ const frame=document.createElement('iframe');frame.title='Slide '+(i+1);frame.sandbox='';frame.style.cssText='width:1200px;height:675px;border:0;max-width:none;transform-origin:top left;flex:none';frame.srcdoc=slidePreviewHTML(slide,d);const preview=document.createElement('div');preview.style.cssText='width:100%;overflow:hidden;border:1px solid #dce3f0;border-radius:12px';preview.append(frame);const resize=new ResizeObserver(([entry])=>{const scale=entry.contentRect.width/1200;frame.style.transform='scale('+scale+')';preview.style.height=(675*scale)+'px';});resize.observe(preview);slidePreviewObservers.push(resize);
+ const title=document.createElement('input');title.value=slide.title;title.maxLength=160;title.setAttribute('aria-label','Title for slide '+(i+1));title.disabled=busy;
+ const changed=()=>{slide.reviewed=false;d.slides.approved=null;save();frame.srcdoc=slidePreviewHTML(slide,d);$('approve-slides').disabled=true;$('next-presenter').hidden=true;};title.oninput=()=>{slide.title=title.value;changed();};card.append(summary,preview,title);if(d.slides.segments){const narration=document.createElement('p');narration.textContent='Narration: '+(d.slides.segments[i]?.say||'');card.append(narration);}
+ for(const [field,label] of [['paragraph','Paragraph'],['bullets','Bullets — one per line'],['code','Code'],['caption','Short annotation']]){if(!slide[field]||(Array.isArray(slide[field])&&!slide[field].length))continue;const l=document.createElement('label');l.textContent=label;const input=document.createElement('textarea');input.value=Array.isArray(slide[field])?slide[field].join('\n'):slide[field];input.rows=field==='code'?8:3;if(field==='paragraph')input.maxLength=180;if(field==='caption')input.maxLength=140;input.disabled=busy;input.oninput=()=>{slide[field]=field==='bullets'?input.value.split('\n').filter(Boolean):input.value;changed();};l.append(input);card.append(l);}
+ if(slide.assetId){
+ slide.visualBrief??=d.assets.items.find(a=>a.id===(slide.requirementId||slide.assetId))?.brief||'';const brief=document.createElement('textarea');brief.value=slide.visualBrief;brief.rows=3;brief.setAttribute('aria-label','Visual description for slide '+(i+1));brief.disabled=busy||visualJobs.has(slide);brief.onchange=()=>{slide.visualBrief=brief.value;slide.assetKept=false;changed();renderSlides();};
+ const status=document.createElement('p');status.classList.toggle('is-loading',visualJobs.has(slide));status.setAttribute('role','status');status.textContent=visualJobs.has(slide)?'Creating this slide’s visual…':slide.visualError||(slide.assetKept?'✓ Visual kept':slide.visual?'Review the visual in the slide, then keep or regenerate.':'Visual not ready. Generate it below.');
+ const actions=document.createElement('div');actions.className='plan-actions';
+ for(const [mode,label] of [['generate',slide.visual?'Regenerate visual':'Generate visual'],['find','Find image']]){const button=document.createElement('button');button.className='control';button.textContent=label;button.disabled=busy||visualJobs.has(slide)||stale;button.onclick=()=>prepareSlideVisual(d,slide,mode);actions.append(button);}
+ const keep=document.createElement('button');keep.className='control';keep.textContent=slide.assetKept?'✓ Visual kept':'Keep this visual';keep.disabled=busy||visualJobs.has(slide)||!slide.visual?.url||stale;keep.onclick=()=>{slide.assetKept=true;save();renderSlides();};actions.append(keep);
+ if(visualJobs.has(slide)){const cancel=document.createElement('button');cancel.textContent='Cancel';cancel.onclick=()=>visualJobs.get(slide)?.abort();actions.append(cancel);}
+ card.append(brief,status,actions);
+ for(const candidate of slide.candidates||[]){if(candidate.url===slide.visual?.url)continue;const img=document.createElement('img');img.src=candidate.url;img.alt=candidate.description||candidate.name;img.style.cssText='width:180px;height:120px;object-fit:contain';const pick=document.createElement('button');pick.textContent='Use '+candidate.name;pick.onclick=()=>{slide.visual=candidate;slide.assetKept=false;changed();renderSlides();};card.append(img,pick);}
  }
- $('approve-slides').disabled=!ready||busy||stale||!d.slides?.items.length||!d.slides.items.every(s=>s.reviewed)||!!d.slides.approved;$('download-slides').disabled=!d.slides||stale;
+ const review=document.createElement('button');review.className='control';review.textContent=slide.reviewed?'✓ Slide reviewed':'Confirm slide';review.disabled=busy||stale||!ready||visualJobs.has(slide)||!!slide.assetId&&!slide.assetKept;review.onclick=()=>{if(!slide.title.trim()||slide.bullets.length>(d.slides.version===2?3:6)||slide.bullets.some(b=>b.length>(d.slides.version===2?90:300))){$('slides-status').textContent='Keep the title and bullets concise.';return;}slide.reviewed=true;save();renderSlides();};card.append(review);
+ const feedback=document.createElement('textarea');feedback.rows=2;feedback.placeholder='What should change on this slide?';feedback.setAttribute('aria-label','Revision comment for slide '+(i+1));feedback.value=slide.revisionComment||'';feedback.disabled=busy;feedback.oninput=()=>{slide.revisionComment=feedback.value;save();};
+ const regenerate=document.createElement('button');regenerate.className='control';regenerate.textContent='Regenerate slide';regenerate.disabled=busy||stale||!ready||visualJobs.size>0;regenerate.onclick=()=>regenerateSlide(d,slide);card.append(feedback,regenerate);$('slides-list').append(card);
+ }
+ $('approve-slides').disabled=!ready||busy||visualJobs.size>0||stale||!d.slides?.items.length||!d.slides.items.every(s=>s.reviewed&&(!s.assetId||s.assetKept!==false))||!!d.slides.approved;$('download-slides').disabled=!d.slides||stale;
 }
 $('next-slides').onclick=()=>go(10);$('back-assets').onclick=()=>go(7);
-$('generate-slides').onclick=async()=>{const d=current();if(slidesJob||!assetsReady(d)||!d.assets?.approved)return;const input=slidesFingerprint(d),controller=new AbortController();slidesJob={id:d.id,controller};renderSlides();const notify=startNotificationTask('HTML slides');try{const r=await fetch('/api/slides',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify(d)}),result=await r.json();if(!r.ok)throw Error(result.error||'Slide generation failed.');if(input!==slidesFingerprint(d)||!drafts.includes(d))throw Error('The source changed. Generate again.');d.slides={...result,input,approved:null};save();notify();slidesJob=null;if(current()?.id===d.id)renderSlides();}catch(e){notify(e);slidesJob=null;if(current()?.id===d.id){renderSlides();$('slides-status').textContent=e.name==='AbortError'?'Cancelled. Your saved slides are unchanged.':e.message;}}};
+$('generate-slides').onclick=async()=>{const d=current();if(slidesJob||!assetsReady(d)||!d.assets?.approved)return;const input=slidesFingerprint(d),controller=new AbortController();slidesJob={id:d.id,controller};renderSlides();const notify=startNotificationTask('HTML slides');try{const r=await fetch('/api/slides',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({...d,deckComment:null})}),result=await r.json();if(!r.ok)throw Error(result.error||'Slide generation failed.');if(input!==slidesFingerprint(d)||!drafts.includes(d))throw Error('The source changed. Generate again.');d.slides={...result,input,approved:null};save();for(const slide of d.slides.items){if(controller.signal.aborted)break;if(slide.assetId&&!slide.visual)await prepareSlideVisual(d,slide,'generate',controller.signal);}notify();slidesJob=null;if(current()?.id===d.id)renderSlides();}catch(e){notify(e);slidesJob=null;if(current()?.id===d.id){renderSlides();$('slides-status').textContent=e.name==='AbortError'?'Cancelled. Your saved slides are unchanged.':e.message;}}};
 $('cancel-slides').onclick=()=>slidesJob?.controller.abort();
-$('approve-slides').onclick=()=>{const d=current();if(!d.slides||d.slides.input!==slidesFingerprint(d)||!d.slides.items.every(s=>s.reviewed))return;d.slides.approved=new Date().toISOString();save();renderSlides();};
+$('deck-comment').oninput=()=>{const d=current();d.deckComment=$('deck-comment').value;save();};
+$('revise-deck').onclick=async()=>{
+ const d=current();if(!d?.deckComment?.trim()||slidesJob||visualJobs.size){$('slides-status').textContent='Describe the changes you want first.';return;}
+ const controller=new AbortController(),input=slidesFingerprint(d),deck=d.slides;slidesJob={id:d.id,controller};renderSlides();const notify=startNotificationTask('Deck revision');let error='';
+ try{const r=await fetch('/api/slides',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify(d)}),result=await r.json();if(!r.ok)throw Error(result.error||'Deck revision failed.');if(d.slides!==deck||input!==slidesFingerprint(d)||!drafts.includes(d))throw Error('Sources changed. Please retry.');d.previousSlides=deck;d.slides={...result,input,approved:null};save();for(const slide of d.slides.items){if(controller.signal.aborted)break;if(slide.assetId&&!slide.visual)await prepareSlideVisual(d,slide,'generate',controller.signal);}notify();}
+ catch(e){error=e.name==='AbortError'?'Cancelled. Saved slides are retained.':e.message;notify(e);}
+ finally{slidesJob=null;if(current()?.id===d.id){renderSlides();if(error)$('slides-status').textContent=error;}}
+};
+$('approve-all-slides').onclick=()=>{const d=current();if(!d?.slides||slidesJob||visualJobs.size||d.slides.input!==slidesFingerprint(d)||d.slides.items.some(s=>s.assetId&&!s.visual?.url))return;for(const s of d.slides.items){s.reviewed=true;s.assetKept=true;}d.slides.approved=new Date().toISOString();save();renderSlides();};
+async function regenerateSlide(d,slide){
+ if(slidesJob||visualJobs.size)return;const controller=new AbortController(),input=slidesFingerprint(d),deck=d.slides;slidesJob={id:d.id,controller};renderSlides();const notify=startNotificationTask('Slide revision');let revisionError='';
+ try{const r=await fetch('/api/slides',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({...d,deckComment:null,regenerateSlide:{segmentId:slide.segmentId,comment:slide.revisionComment||'Improve clarity and visual presentation.'}})}),result=await r.json();if(!r.ok)throw Error(result.error||'Revision failed.');if(d.slides!==deck||input!==slidesFingerprint(d)||!drafts.includes(d))throw Error('The source changed. Retry the revision.');const i=deck.items.indexOf(slide);if(i<0)return;deck.items[i]={...result.item,revisionComment:slide.revisionComment};deck.approved=null;save();if(result.item.assetId)await prepareSlideVisual(d,deck.items[i],'generate',controller.signal);notify();}
+ catch(e){notify(e);revisionError=e.name==='AbortError'?'Revision cancelled.':e.message;}
+ finally{slidesJob=null;if(current()?.id===d.id){renderSlides();if(revisionError)$('slides-status').textContent=revisionError;}}
+}
+$('approve-slides').onclick=()=>{const d=current();if(!d.slides||d.slides.input!==slidesFingerprint(d)||!d.slides.items.every(s=>s.reviewed&&(!s.assetId||(s.visual?.url&&s.assetKept!==false))))return;d.slides.approved=new Date().toISOString();save();renderSlides();};
 $('download-slides').onclick=()=>{const d=current(),url=URL.createObjectURL(new Blob([deckHTML(d.slides.items,approvedVisuals(d))],{type:'text/html'})),a=document.createElement('a');a.href=url;a.download='lecture-slides.html';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 
 $('next-presenter').onclick=()=>{if(slidesReady(current())&&scriptReady(current()))go(8);};
+
+async function suggestLectureSplit(d){
+ const input=splitFingerprint(d),controller=new AbortController();planJob={id:d.id,controller};renderPlan();$('generation-status').textContent='AI is grouping the material into lectures. You will review the coverage before anything is created.';const notify=startNotificationTask('Lecture split proposal');
+ try{const r=await fetch('/api/split-lecture',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({title:d.title,brief:d.brief,presentation:d.presentation,ai:d.ai,approved:d.approved,sources:d.sources.map(({id,name,text})=>({id,name,text}))})}),data=await r.json();if(!r.ok)throw Error(data.error||'Could not propose a split.');if(input!==splitFingerprint(d)||!drafts.includes(d))throw Error('The sources changed. Suggest a new split.');d.splitProposal={...data,input};save();notify();planJob=null;if(current()?.id===d.id){renderPlan();$('generation-status').textContent='Review the proposed lectures below. Your original lecture remains unchanged.';}}
+ catch(e){notify(e);planJob=null;if(current()?.id===d.id){renderPlan();$('generation-status').textContent=e.name==='AbortError'?'Split proposal cancelled.':e.message;}}
+}
+function renderSplitReview(d){
+ const panel=$('split-review');panel.replaceChildren();panel.hidden=!d.splitProposal;if(!d.splitProposal)return;
+ const proposal=d.splitProposal,stale=proposal.input!==splitFingerprint(d),heading=document.createElement('h3');heading.textContent='Review proposed lecture sequence';panel.append(heading);
+ const note=document.createElement('p');note.textContent=stale?'Source or setup changed. Request a new proposal.':'All source text is covered once, in order. AI recommends boundaries using source excerpts; review the exact text below. Duration is an estimate per lecture.';panel.append(note);
+ for(const [i,p] of proposal.lectures.entries()){const units=proposal.units.slice(p.from-1,p.to),card=document.createElement('article');card.className='asset-review-card';const title=document.createElement('h4');title.textContent=`Lecture ${i+1}: ${p.title} · ${p.minutes} min`;const range=document.createElement('p');range.textContent=`From ${units[0].sourceName}: “${units[0].from}” → To ${units.at(-1).sourceName}: “${units.at(-1).to}”`;const reason=document.createElement('p');reason.textContent=p.reason;card.append(title,range,reason);
+ if(!stale){const details=document.createElement('details'),summary=document.createElement('summary'),text=document.createElement('pre');summary.textContent='Review exact included material';text.style.cssText='white-space:pre-wrap;max-height:300px;overflow:auto;font:inherit';text.textContent=splitSources(d.sources,proposal.units,p).map(s=>s.name+'\n'+s.text).join('\n\n');details.append(summary,text);card.append(details);}panel.append(card);}
+ const approve=document.createElement('button');approve.className='primary';approve.textContent=proposal.createdIds?'✓ Lectures created':'Approve split & create lectures';approve.disabled=stale||!!planJob||!!proposal.createdIds;
+ approve.onclick=()=>{if(proposal.input!==splitFingerprint(d)||proposal.createdIds)return;const units=sourceUnits(d.sources);validateSplit(proposal,units);const children=proposal.lectures.map((p,i)=>({id:crypto.randomUUID(),title:p.title,brief:{...d.brief,duration:p.minutes},ai:structuredClone(d.ai),presentation:structuredClone(d.presentation),sources:splitSources(d.sources,units,p),approved:new Date().toISOString(),wizardStep:5,furthestStep:5,splitFrom:d.id,splitPart:i+1}));
+ for(const child of children)if(child.presentation?.mode==='original'&&!child.sources.some(s=>s.id===child.presentation.sourceId)){child.presentation={mode:'generated',sourceId:null};child.approved=null;child.wizardStep=3;}
+ proposal.createdIds=children.map(c=>c.id);drafts.unshift(...children);selected=children[0].id;save();render();$('studio-status').textContent=`Created ${children.length} lectures. The original is preserved. Review each lecture’s details, then generate its plan.`;};panel.append(approve);
+}
+$('connect-eleven').onclick=async()=>{const button=$('connect-eleven');button.disabled=true;try{const r=await fetch('/api/elevenlabs-settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKey:$('eleven-key').value,voiceId:$('eleven-voice').value})});if(!r.ok)throw Error('Could not save ElevenLabs settings.');$('eleven-key').value='';$('eleven-status').textContent='Connection saved. Prepare clips to generate with Eleven v4.';}catch(e){$('eleven-status').textContent=e.message;}finally{button.disabled=false;}};

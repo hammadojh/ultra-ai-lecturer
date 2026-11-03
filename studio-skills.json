@@ -1,0 +1,142 @@
+[
+  {
+    "id": "ultra",
+    "name": "Ultra",
+    "inputs": [
+      "source"
+    ],
+    "output": "package",
+    "format": "zip",
+    "version": "1.1.0",
+    "updatedAt": "2026-10-19",
+    "changes": "Includes animation and annotations unless explicitly skipped; custom activity timing and ElevenLabs voice."
+  },
+  {
+    "id": "material-maker",
+    "name": "Material maker",
+    "inputs": [
+      "source"
+    ],
+    "output": "article",
+    "format": "markdown",
+    "version": "1.0.0",
+    "updatedAt": "2026-10-19",
+    "changes": "First versioned Studio release."
+  },
+  {
+    "id": "lecture-planner",
+    "name": "Lecture planner",
+    "inputs": [
+      "article"
+    ],
+    "output": "plan",
+    "format": "markdown",
+    "version": "1.1.0",
+    "updatedAt": "2026-10-19",
+    "changes": "Chooses a custom answer window for each activity."
+  },
+  {
+    "id": "slides-maker",
+    "name": "Slides maker",
+    "inputs": [
+      "article",
+      "plan"
+    ],
+    "output": "slides",
+    "format": "html",
+    "version": "1.0.0",
+    "updatedAt": "2026-10-19",
+    "changes": "First versioned Studio release."
+  },
+  {
+    "id": "slides-retoucher",
+    "name": "Slides retoucher",
+    "inputs": [
+      "slides"
+    ],
+    "output": "slides",
+    "format": "html",
+    "version": "1.0.0",
+    "updatedAt": "2026-10-19",
+    "changes": "First versioned Studio release."
+  },
+  {
+    "id": "slide-animator",
+    "name": "Slide animator",
+    "inputs": [
+      "slides"
+    ],
+    "output": "animated-slides",
+    "format": "html",
+    "version": "1.0.0",
+    "updatedAt": "2026-10-19",
+    "changes": "First versioned Studio release."
+  },
+  {
+    "id": "script-generator",
+    "name": "Script generator",
+    "inputs": [
+      "article",
+      "plan",
+      "animated-slides"
+    ],
+    "output": "script",
+    "format": "markdown",
+    "version": "1.1.0",
+    "updatedAt": "2026-10-19",
+    "changes": "Carries planned activity timings into classroom checkpoints."
+  },
+  {
+    "id": "script-toner",
+    "name": "Script toner",
+    "inputs": [
+      "animated-slides",
+      "script"
+    ],
+    "output": "toned-script",
+    "format": "markdown",
+    "version": "1.0.0",
+    "updatedAt": "2026-10-19",
+    "changes": "First versioned Studio release."
+  },
+  {
+    "id": "speech-generator",
+    "name": "Speech generator",
+    "inputs": [
+      "animated-slides",
+      "toned-script"
+    ],
+    "output": "audio",
+    "format": "json",
+    "version": "1.1.0",
+    "updatedAt": "2026-10-19",
+    "changes": "Uses ElevenLabs API with environment key checks and secure missing-key guidance."
+  },
+  {
+    "id": "annotator",
+    "name": "Annotator",
+    "inputs": [
+      "animated-slides",
+      "toned-script",
+      "audio"
+    ],
+    "output": "annotations",
+    "format": "json",
+    "version": "1.0.0",
+    "updatedAt": "2026-10-19",
+    "changes": "First versioned Studio release."
+  },
+  {
+    "id": "avatar-chooser",
+    "name": "Avatar chooser",
+    "inputs": [
+      "toned-script",
+      "audio"
+    ],
+    "output": "avatar",
+    "format": "json",
+    "version": "1.0.0",
+    "updatedAt": "2026-10-19",
+    "changes": "First versioned Studio release."
+  }
+]

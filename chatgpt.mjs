@@ -86,7 +86,7 @@ export async function disconnect(){
  record={host:r.host,client_id:r.client_id,subject:r.subject};await persist();
  return {revoked};
 }
-export async function readResponseStream(body){
+export async function readResponseStream(body,onDelta){
  const reader=body.getReader(),decoder=new TextDecoder();let buffer='',text='',completed=false;
  try{
   while(true){
@@ -96,7 +96,7 @@ export async function readResponseStream(body){
     const line=buffer.slice(0,boundary).trim();buffer=buffer.slice(boundary+1);
     if(!line.startsWith('data:'))continue;const raw=line.slice(5).trim();if(raw==='[DONE]')continue;
     const event=JSON.parse(raw);
-    if(event.type==='response.output_text.delta')text+=event.delta;
+    if(event.type==='response.output_text.delta'){text+=event.delta;onDelta?.(event.delta,text);}
     if(['response.failed','response.incomplete','error'].includes(event.type))throw Error('ChatGPT could not finish the plan ('+(event.response?.error?.code||event.code||event.type)+'). Check your plan limits or retry.');
     if(event.type==='response.completed')completed=true;
    }
@@ -106,12 +106,12 @@ export async function readResponseStream(body){
  if(!completed)throw Error('ChatGPT response was interrupted. The previous plan is unchanged.');
  return text;
 }
-export async function chatgptPlan({model,instructions,input,schema,signal}){
+export async function chatgptPlan({model,instructions,input,schema,signal,reasoningEffort,onDelta}){
  const models=await availableModels();if(!models.some(m=>m.id===model))throw Error('Choose a model available to your ChatGPT account.');
  const token=await accessToken(),version=sessionVersion;
- const response=await fetch(resource+'/responses',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},signal,body:JSON.stringify({model,instructions,input:[{role:'user',content:input}],store:false,stream:true,text:{format:{type:'json_schema',name:'lecture_plan',strict:true,schema}}})});
+ const response=await fetch(resource+'/responses',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},signal,body:JSON.stringify({model,...(reasoningEffort?{reasoning:{effort:reasoningEffort}}:{}),instructions,input:[{role:'user',content:input}],store:false,stream:true,text:{format:{type:'json_schema',name:'lecture_plan',strict:true,schema}}})});
  if(!response.ok)throw Error('ChatGPT request failed ('+response.status+'). Check account access and usage limits; you can switch to Local AI.');
- const result=await readResponseStream(response.body);
+ const result=await readResponseStream(response.body,onDelta);
  if(version!==sessionVersion)throw Error('ChatGPT connection changed. Generate again.');
  return result;
 }

@@ -11,7 +11,7 @@ export function planInput(draft){
   if(typeof s.id!=='string'||ids.has(s.id)||typeof s.name!=='string'||typeof s.text!=='string'||!s.text.trim())throw Error('Invalid source material.');
   ids.add(s.id);return {id:s.id,name:s.name,text:s.text};
  });
- if(sources.reduce((n,s)=>n+s.text.length,0)>50000)throw Error('This local planning slice supports 50,000 source characters. Split this lecture into smaller parts; no material has been silently omitted.');
+ if(sources.reduce((n,s)=>n+s.text.length,0)>50000)throw Error('This material exceeds the 50,000-character planning limit. Use “Suggest lecture split with AI” to review a proposed sequence. No material has been omitted.');
  const presentation={mode:draft.presentation?.mode==='original'?'original':'generated',sourceId:draft.presentation?.sourceId||null};
  return {title:draft.title,brief:{audience:brief.audience.slice(0,300),goals:brief.goals.slice(0,5000),duration:brief.duration},presentation,sources};
 }
@@ -61,7 +61,7 @@ export async function generateStructured(draft,messages,schema,signal){
  const model=cloud?draft.ai.model:(process.env.ULTRA_CHAT_MODEL||'qwen3:14b');
  let content;
  if(draft.ai?.provider==='openrouter')content=await openrouterPlan({model,messages,schema,signal});
- else if(cloud)content=await chatgptPlan({model,instructions:messages[0].content,input:messages[1].content,schema,signal});
+ else if(cloud)content=await chatgptPlan({model,instructions:messages[0].content,input:messages[1].content,schema,signal,reasoningEffort:draft.ai.reasoningEffort});
  else{
  const response=await fetch('http://127.0.0.1:11434/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal,body:JSON.stringify({model,stream:false,think:false,keep_alive:'10m',format:schema,options:{temperature:.2,num_ctx:32768,num_predict:16000},messages})});
  if(!response.ok)throw Error('Local planning model unavailable. Start Ollama and try again.');

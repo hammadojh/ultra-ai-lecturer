@@ -1,3 +1,4 @@
+import {readVoice} from './eleven-voice.mjs';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
@@ -14,7 +15,7 @@ export async function generateAnnotations(root,request,signal){
  if(typeof text!=='string'||!text.trim()||text.length>600||typeof cue!=='string'||cue.length>12000||!/^\/imports\/[0-9a-f-]{36}\/[0-9]+\.png$/.test(imageUrl))throw Error('Invalid slide or narration input.');
  const bytes=await readFile(path.join(root,'.cache',imageUrl.slice(1)));if(bytes.length>12000000)throw Error('Slide image is too large.');
  const key=createHash('sha256').update(JSON.stringify({text,voice:'af_bella',speed:1,model:'kokoro-timestamped-q8',version:1})).digest('hex');
- const speech=JSON.parse(await readFile(path.join(root,'.cache/speech',key+'.json'),'utf8'));
+ const speech=await readVoice(root,text).catch(async()=>JSON.parse(await readFile(path.join(root,'.cache/speech',key+'.json'),'utf8')));
  const words=speech.words;if(!words?.length||speech.wtimes?.length!==words.length||speech.wdurations?.length!==words.length)throw Error('Prepared word timing is missing. Prepare voice again.');
  const properties={style:{type:'string',enum:['highlight','circle','underline']},x:{type:'number'},y:{type:'number'},w:{type:'number'},h:{type:'number'},startWord:{type:'integer'},endWord:{type:'integer'}};
  const schema={type:'object',properties:{annotations:{type:'array',items:{type:'object',properties,required:Object.keys(properties),additionalProperties:false}}},required:['annotations'],additionalProperties:false};

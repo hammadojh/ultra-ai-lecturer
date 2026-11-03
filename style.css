@@ -155,3 +155,95 @@
 .student-app .player-bar .navigation button{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;min-width:36px;min-height:36px;padding:0;line-height:1;font-size:22px;flex-shrink:0}
 .student-app .player-bar .navigation{gap:10px}
 .student-app .player-bar .navigation #progress{min-width:56px;text-align:center;white-space:nowrap}
+
+/* Student browse and watch layouts. Uses the classroom's existing color tokens. */
+.student-app .topbar{position:sticky;top:0;z-index:30;height:72px;padding:0 28px;gap:22px;background:var(--paper);border-bottom:0}
+.student-app .topbar .brand{font-size:27px;flex-shrink:0}
+.icon-button{border:0;background:transparent;color:var(--ink);font-size:21px;width:40px;height:40px;border-radius:50%;flex-shrink:0}
+.student-app .topbar .lecture-search-label{margin:0 auto;display:flex;align-items:center;position:relative;width:min(48vw,640px)}
+.student-app #student-search{width:100%;height:42px;border-radius:24px;padding:0 52px 0 20px;background:#fff;border:1px solid var(--line);font:14px 'DM Sans',sans-serif;color:var(--ink)}
+.lecture-search-label>span:last-child:not(.sr-only){position:absolute;right:18px;font-size:25px;pointer-events:none}
+.student-app #lecture-breadcrumb{display:none}
+.student-app .student{flex-shrink:0}
+.student-app .account-logout{white-space:nowrap}
+.student-sidebar{position:fixed;top:84px;left:12px;bottom:0;width:204px;z-index:20;padding:8px;background:var(--paper)}
+.student-sidebar button,.student-sidebar a{width:100%;display:flex;align-items:center;gap:16px;border:0;background:transparent;padding:13px 14px;border-radius:9px;color:var(--ink);font-size:14px;text-align:left}
+.student-sidebar [aria-current=page]{background:#e3eafb;font-weight:650}
+.student-sidebar button:hover,.student-sidebar a:hover{background:#e8edf7}
+.student-sidebar span{font-size:22px;line-height:1;width:24px;text-align:center}
+.sidebar-divider{height:1px;background:var(--line);margin:20px 10px}
+.student-sidebar p{font-size:12px;line-height:1.8;color:var(--muted);padding:12px 14px}
+.student-app main{max-width:1920px;margin-left:228px;padding:26px 32px 0}
+.student-app .library-intro{margin:0 0 28px;display:flex;align-items:baseline;gap:18px}
+.student-app .library-intro h1{font-size:27px;margin:0;letter-spacing:-.7px}
+.student-app .library-intro p{font-size:14px;margin:0;color:var(--muted)}
+.student-app .library-heading{margin:0 0 20px;border-bottom:1px solid var(--line);padding-bottom:16px}
+.student-app .library-heading h2{font-size:14px;margin:0;font-weight:600}
+.student-app #lecture-total{margin-left:8px;color:var(--muted)}
+#library-status:empty{display:none}
+.student-app .lecture-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:34px 22px;border:0}
+.lecture-card{min-width:0}.lecture-card[hidden]{display:none}
+.lecture-card-link{display:block;border-radius:12px}.lecture-thumbnail{position:relative;aspect-ratio:16/9;border-radius:12px;overflow:hidden;padding:22px;background:#e1e9fd;color:#233d88;display:flex;flex-direction:column;justify-content:center}
+.lecture-card:nth-child(3n+2) .lecture-thumbnail{background:#dde9ec;color:#244c5e}.lecture-card:nth-child(3n) .lecture-thumbnail{background:#e9e5f4;color:#4d416c}
+.thumbnail-label{font-size:9px;letter-spacing:2px;position:absolute;top:18px;left:22px;font-weight:700}
+.lecture-thumbnail strong{font:650 clamp(18px,1.7vw,30px)/1.2 Manrope,sans-serif;letter-spacing:-.8px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;max-width:90%;padding-top:10px}
+.thumbnail-duration{position:absolute;right:10px;bottom:10px;background:#182b4ce8;color:#f5f7fc;border-radius:4px;padding:3px 6px;font-size:11px}
+.thumbnail-play{position:absolute;inset:0;display:grid;place-items:center;background:#1c2c5026;font-size:46px;opacity:0;transition:opacity .18s}
+.lecture-card-link:hover .thumbnail-play,.lecture-card-link:focus-visible .thumbnail-play{opacity:1}
+.lecture-card-body{padding:13px 2px}.lecture-card h3{font-size:16px;line-height:1.4;margin:0 0 6px;font-weight:650;letter-spacing:-.25px}.lecture-card p{font-size:12px;color:var(--muted);margin:0 0 4px}.lecture-card-action{font-size:12px;color:var(--muted)}
+.student-app .demo-library{margin-top:32px;padding:18px 0;border-top:1px solid var(--line);background:transparent}
+.student-app.watch-page main{margin-left:0;padding:20px 32px}.watch-page .student-sidebar{display:none}
+.student-app.watch-page .classroom{grid-template-columns:minmax(0,1fr) 350px;gap:26px}
+.student-app.watch-page .stage{min-height:0;aspect-ratio:16/9;scroll-margin-top:88px}
+.student-app.watch-page .lecture-heading{margin:18px 0 12px}.student-app.watch-page .lecture-heading h1{font-size:23px;line-height:1.4;letter-spacing:-.6px}.student-app.watch-page .lecture-heading p{display:block;font-size:13px;margin-top:8px}
+.student-app.watch-page .questions{height: min(680px,calc(100dvh - 115px));min-height:420px;background:transparent;border-radius:12px}
+.student-app .lecture-description{background:#eaf0fa;border-radius:12px;padding:16px 18px;margin-top:20px}.lecture-description summary{cursor:pointer;font-weight:650;font-size:14px}.lecture-description p{font-size:13px;line-height:1.7;max-width:75ch;color:var(--muted)}
+.slide-chapters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 16px;margin-top:16px}.slide-chapter{display:flex;gap:12px;text-align:left;align-items:baseline;border:0;background:transparent;color:var(--ink);padding:10px 6px;border-radius:5px;line-height:1.5;font-size:13px}.slide-chapter>span:first-child{font-variant-numeric:tabular-nums;color:var(--green);font-weight:650}.slide-chapter>span:last-child{min-width:0;overflow-wrap:anywhere}
+.navigation-collapsed .student-sidebar{display:none}.student-app.navigation-collapsed main{margin-left:0}
+.student-app.focus-mode .lecture-heading,.student-app.focus-mode .lecture-description{display:none}
+@media(min-width:801px){.student-app.watch-page.focus-mode .classroom{grid-template-columns:minmax(0,1fr) 350px}.student-app.watch-page.focus-mode .stage{height:calc(100dvh - 340px);min-height:300px;aspect-ratio:auto}.student-app.watch-page.focus-mode .questions{height:250px;min-height:0}}
+@media(min-width:1700px){.student-app .lecture-list{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:1200px){.student-app .lecture-list{grid-template-columns:repeat(2,minmax(0,1fr))}.student-sidebar{width:180px}.student-app main{margin-left:200px;padding:22px}.student-app.watch-page .classroom{grid-template-columns:minmax(0,1fr) 310px;gap:18px}.student-app .topbar{gap:14px;padding:0 20px}}
+@media(max-width:800px){.student-app .topbar{height:auto;min-height:66px;padding:12px 16px;gap:12px;flex-wrap:wrap}.student-app .topbar .brand{font-size:24px}.student-app .topbar .lecture-search-label{order:5;width:100%;margin:0}.student-app .student{margin-left:auto}.student-app .account-logout{font-size:12px!important}.student-sidebar{top:124px;width:220px;box-shadow:8px 8px 24px #1c2c5012;border:1px solid var(--line);border-radius:12px;bottom:auto}.student-app main,.student-app.watch-page main{margin-left:0;padding:20px 16px}.student-app .library-intro{display:block;margin-bottom:24px}.student-app .library-intro p{margin-top:8px}.student-app .lecture-list{gap:22px 16px}.lecture-thumbnail{padding:20px 16px}.thumbnail-label{left:16px;top:12px;font-size:8px}.lecture-thumbnail strong{font-size:20px}.student-app.watch-page .classroom,.student-app.watch-page.focus-mode .classroom{grid-template-columns:1fr}.student-app.watch-page .stage{padding:18px;min-height:350px;aspect-ratio:auto}.student-app.authored-classroom.watch-page .stage{padding:0;min-height:0;aspect-ratio:16/9}.student-app.watch-page .questions{height:480px;min-height:0}.student-app.watch-page .lecture-heading h1{font-size:21px}.slide-chapters{grid-template-columns:1fr}.student-app .player-bar{gap:6px}.student-app .player-bar #elapsed{margin-left:auto}.student-app .player-bar .navigation{margin-left:auto}}
+@media(max-width:520px){.student-app .lecture-list{grid-template-columns:1fr}.lecture-thumbnail strong{font-size:26px}.student-app .student{display:none}.student-app .account-logout{margin-left:auto}}
+.student-app #lecture-breadcrumb{display:none!important}
+.student-app.watch-page:not(.navigation-collapsed) .student-sidebar{display:block;border:1px solid var(--line);border-radius:12px;bottom:auto;box-shadow:8px 8px 24px #1c2c5012}
+.student-app .library-intro{padding:8px 0 4px}
+@media(max-width:800px){
+ .student-app.watch-page:not(.authored-classroom) .stage{min-height:470px;padding-bottom:115px}
+ .student-app.watch-page:not(.authored-classroom) .stage>.caption{right:25%;color:#fff}
+ .student-app #timeline-checkpoints{position:relative;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;padding-top:8px}
+ .student-app #timeline-checkpoints .checkpoint-marker{position:static;transform:none!important;max-width:100%}
+ .student-app .timeline-track{padding-bottom:4px}
+}
+
+/* Quiet slide swaps and explicit classroom participation controls. */
+.student-app #slide-content,.student-app #classroom-slide-image{animation:none;transition:none}
+.student-app .message-composer #question{height:36px;max-height:110px;resize:none;padding:8px 0;overflow-y:auto}
+.question-item p{white-space:pre-wrap;overflow-wrap:anywhere}
+.activity-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+.activity-controls .control{font-size:12px;padding:8px 12px}
+#facilitator-controls{display:flex;gap:8px;align-items:center}
+#time-status,#chat-keyboard-help{font-size:11px;color:var(--muted)}
+#chat-keyboard-help{display:block;margin-top:6px}
+.student-app .composer-heading{position:static;width:auto;height:auto;overflow:visible;clip-path:none;gap:8px;margin-bottom:8px}
+.student-app .composer-heading label{font-size:12px}
+.student-app .composer-heading select{max-width:65%;font-size:12px;min-height:32px}
+
+.chat-activity-controls{flex-shrink:0;margin:12px 0 0;padding-top:12px;border-top:1px solid var(--line)}
+.chat-activity-controls #facilitator-controls{flex-wrap:wrap}
+.chat-activity-controls:has(>button:not([hidden])),.chat-activity-controls:has(#facilitator-controls:not([hidden])){display:flex}
+.chat-activity-controls:not(:has(>button:not([hidden]))):not(:has(#facilitator-controls:not([hidden]))){display:none}
+.student-app.no-avatar .stage>.caption{right:20px}.student-app.no-avatar .stage #slide-content{padding-right:0}
+
+/* Compact participation switch and timing actions. */
+.message-kind-switch{display:flex;width:100%;gap:3px;padding:3px;border:1px solid var(--line);border-radius:8px;background:var(--paper)}
+.message-kind-switch button{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;min-width:0;min-height:36px;padding:6px 5px;border:0;border-radius:5px;background:transparent;color:var(--muted);font-size:11px;font-weight:600;white-space:nowrap}
+.message-kind-switch button[aria-pressed="true"]{background:var(--green);color:var(--paper)}
+.message-kind-switch svg,.chat-activity-controls .control svg{width:16px;height:16px;flex-shrink:0}
+.chat-activity-controls{gap:6px}
+.chat-activity-controls #facilitator-controls{display:contents}
+.chat-activity-controls .control{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:34px;padding:6px 4px;font-size:11px;white-space:nowrap;flex:1;min-width:0}
+.chat-activity-controls #answer-now{flex-basis:100%}
+.chat-activity-controls #time-status:not(:empty){flex-basis:100%}
+@media(pointer:coarse){.message-kind-switch button,.chat-activity-controls .control{min-height:44px}}

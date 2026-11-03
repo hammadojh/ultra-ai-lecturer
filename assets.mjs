@@ -1,6 +1,6 @@
 import {generateStructured} from './planning.mjs';
 import {scriptInput} from './scripting.mjs';
-export function sourceAssets(draft){return (draft.sources||[]).flatMap(s=>(s.import?.assets||[]).map((a,i)=>({id:s.id+':'+i,sourceId:s.id,sourceName:s.name,label:a.label||'Source visual',kind:a.kind,url:a.url}))).filter(a=>/^\/imports\/[0-9a-f-]{36}\/[0-9]+\.(png|jpe?g|gif|webp)$/.test(a.url));}
+export function sourceAssets(draft){return (draft.sources||[]).flatMap(s=>(s.import?.assets||[]).map((a,i)=>({id:s.id+':'+i,sourceId:s.id,sourceName:s.name,label:a.label||'Source visual',kind:a.kind,url:a.url}))).filter(a=>a.kind!=='page'&&/^\/imports\/[0-9a-f-]{36}\/[0-9]+\.(png|jpe?g|gif|webp)$/.test(a.url));}
 export function validateAssetBrief(value,available){
  if(!Array.isArray(value?.items)||value.items.length>50)throw Error('Invalid asset list.');const ids=new Set(available.map(a=>a.id));
  for(const item of value.items)if(!['title','purpose','scriptLocation','brief'].every(k=>typeof item[k]==='string'&&item[k].trim())||typeof item.assetId!=='string'||(item.assetId&&!ids.has(item.assetId)))throw Error('Invalid asset requirements or source references.');

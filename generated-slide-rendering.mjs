@@ -8,7 +8,7 @@ import {slidesReady,approvedVisuals,deckHTML} from './slides.mjs';
 const execute=promisify(execFile),jobs=new Map();
 export async function renderGeneratedSlides(root,d){
  if(!slidesReady(d))throw Error('Approve the current generated slide deck first.');
- const key=createHash('sha256').update(JSON.stringify({items:d.slides.items,visuals:approvedVisuals(d),version:1})).digest('hex');
+ const key=createHash('sha256').update(JSON.stringify({items:d.slides.items,visuals:approvedVisuals(d),version:2})).digest('hex');
  const manifest=path.join(root,'.cache','generated-'+key+'.json');
  try{return JSON.parse(await readFile(manifest,'utf8'));}catch{}
  if(jobs.has(key))return jobs.get(key);

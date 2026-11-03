@@ -10,9 +10,9 @@ test('new messages never interrupt selected batch; coverage commits after delive
  d.accept({addressedIds:[a.id],deferredIds:[]});assert.equal(a.status,'selected');
  d.delivered('Multiply seven by two.');assert.equal(a.status,'addressed');assert.equal(b.status,'queued');assert.equal(d.select()[0].id,b.id);
 });
-test('empty checkpoint follows idle timeout; continual arrivals cannot exceed budget',()=>{
+test('idle timeout still applies while generation time is excluded',()=>{
  const d=new Discussion({budgetSeconds:30,idleSeconds:5,reserveSeconds:10});d.start();d.tick(5);assert.equal(d.state,'closed');
- d.reset();d.add('Question');d.start();d.select();d.tick(30);assert.equal(d.state,'closed');assert.equal(d.messages[0].status,'deferred');
+ d.reset();d.add('Question');d.start();d.select();d.tick(30);assert.equal(d.state,'reviewing');assert.equal(d.remaining,30);assert.equal(d.messages[0].status,'selected');
 });
 test('spoken response finishes naturally at time limit',()=>{
  const d=new Discussion();const a=d.add('14','answer');d.start();d.select();d.accept({addressedIds:[a.id],deferredIds:[]});d.tick(100);assert.equal(d.state,'speaking');d.delivered('Correct.');assert.equal(d.state,'closed');assert.equal(a.status,'addressed');
@@ -49,4 +49,18 @@ test('final checkpoint revisits deferred messages and stays open across response
  d.accept({addressedIds:[m.id],deferredIds:[]});d.delivered('Answer');assert.equal(d.idle,30);
  const p=new LecturePlayer(lecture.segments,{checkpoints:true});p.index=p.segments.length-1;p.play();p.tick(100);
  assert.equal(p.state,'discussion');p.continue();assert.equal(p.state,'completed');
+});
+
+test('peer conversation never enters assessment batches or becomes deferred',()=>{
+ const d=new Discussion();const peer=d.add('Let us compare our approaches','discussion');const answer=d.add('14','answer');
+ d.start();assert.deepEqual(d.pending,[answer]);assert.deepEqual(d.select(),[answer]);d.close();d.start({final:true});
+ assert.equal(peer.status,'conversation');assert.ok(!d.pending.includes(peer));
+});
+test('extend a follow-up adds to both overall and idle time',()=>{
+ const d=new Discussion({budgetSeconds:90,idleSeconds:12});assert.equal(d.extend(),false);d.start();d.tick(10);assert.equal(d.extend(30),true);
+ assert.equal(d.remaining,110);assert.equal(d.idle,32);d.tick(3);assert.equal(d.state,'followup');assert.equal(d.extend(Infinity),false);
+});
+
+test('buffering preserves budget and history retains the actual question',()=>{
+ const d=new Discussion();const m=d.add('Why double seven?');d.start();d.select();d.accept({addressedIds:[m.id],deferredIds:[]});d.tick(50,{buffering:true});assert.equal(d.remaining,90);d.tick(2);assert.equal(d.remaining,88);d.delivered('The rule multiplies by two.');assert.deepEqual(d.history,[{questions:['Why double seven?'],reply:'The rule multiplies by two.'}]);
 });

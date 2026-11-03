@@ -1,4 +1,4 @@
-export const voiceModel='Kokoro-82M · Bella (English)';
+export const voiceModel='ElevenLabs · Eleven v4';
 export function voiceFingerprint(d){return JSON.stringify({direction:d.direction?.markdown,input:d.direction?.input,voice:voiceModel});}
 export function narrationClips(markdown){
  const blocks=[...markdown.matchAll(/^### Approved narration — verbatim\s*\n([\s\S]*?)(?=^### |^## |$(?![\s\S]))/gm)].map(m=>m[1].trim());

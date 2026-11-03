@@ -1,0 +1,12 @@
+import ultra from '../studio-skills/ultra/SKILL.md';
+import skill0 from '../studio-skills/material-maker/SKILL.md';
+import skill1 from '../studio-skills/lecture-planner/SKILL.md';
+import skill2 from '../studio-skills/slides-maker/SKILL.md';
+import skill3 from '../studio-skills/slides-retoucher/SKILL.md';
+import skill4 from '../studio-skills/slide-animator/SKILL.md';
+import skill5 from '../studio-skills/script-generator/SKILL.md';
+import skill6 from '../studio-skills/script-toner/SKILL.md';
+import skill7 from '../studio-skills/speech-generator/SKILL.md';
+import skill8 from '../studio-skills/annotator/SKILL.md';
+import skill9 from '../studio-skills/avatar-chooser/SKILL.md';
+export default {'ultra':ultra,'material-maker':skill0,'lecture-planner':skill1,'slides-maker':skill2,'slides-retoucher':skill3,'slide-animator':skill4,'script-generator':skill5,'script-toner':skill6,'speech-generator':skill7,'annotator':skill8,'avatar-chooser':skill9};

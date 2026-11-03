@@ -36,3 +36,43 @@
 #lecture-library>summary{font-size:14px;font-weight:600;cursor:pointer;padding:5px 0}.studio-app #workflow-nav{scrollbar-width:thin}@media(max-width:720px){#lecture-library{padding:10px 12px;background:white;border:1px solid var(--line);border-radius:7px}.draft-sidebar nav{margin-top:12px;padding-top:12px}.studio-heading{margin-bottom:12px}.save-banner{padding-bottom:12px}.studio-layout{gap:16px}}
 .voice-clip-row summary .clip-status{display:inline-block;margin-left:12px;font-size:12px;font-weight:400;color:var(--muted)}
 .asset-candidates{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin:16px 0}.asset-candidates article{padding:16px;border:1px solid #dce3f0;border-radius:12px;display:flex;flex-direction:column;gap:10px}.asset-candidates img{width:100%;height:200px;object-fit:contain;background:white}.asset-candidates p{font-size:13px;max-height:100px;overflow:auto}.asset-review-card{border-bottom:1px solid #dce3f0;padding-bottom:24px;margin-bottom:24px}#asset-phase-controls{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}#asset-production-progress{padding:16px 0;color:#526482}
+/* Keep provider and model labels and controls on matching rows. */
+.studio .model-choice{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+.studio .model-choice>div{min-width:0}
+.studio .model-choice label{margin:0 0 8px}
+.studio .model-choice select{display:block;width:100%;max-width:none;min-width:0;min-height:44px;margin:0;box-sizing:border-box}
+.studio .model-choice #model-status{margin:10px 0 0;line-height:1.5}
+@media(max-width:720px){.studio .model-choice{grid-template-columns:minmax(0,1fr);gap:16px}}
+
+/* Active work retains its status text alongside a decorative progress spinner. */
+.is-loading::before{content:"";display:inline-block;width:1em;height:1em;box-sizing:border-box;margin-right:.55em;vertical-align:-.12em;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:ultra-spinner .8s linear infinite}
+@keyframes ultra-spinner{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.is-loading::before{animation:none;border-style:dotted}}
+
+/* Keep studio navigation together instead of distributing each control across the header. */
+.studio-app .topbar{justify-content:flex-start;height:auto;min-height:64px;padding-block:10px;flex-wrap:wrap;gap:12px 24px}
+.studio-app .topbar .brand{flex-shrink:0;white-space:nowrap}
+.studio-header-actions{margin-left:auto;display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:12px;min-width:0}
+.studio-header-actions .nav-link{font-size:13px;white-space:nowrap;margin-right:8px}
+.studio-account-label{font-size:12px;color:var(--muted);white-space:nowrap;padding-right:12px;border-right:1px solid var(--line)}
+.studio-header-actions .control{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:7px 12px;font:500 13px/1.3 'DM Sans',sans-serif;white-space:nowrap}
+.studio-header-actions .account-logout{font-size:13px!important}
+.studio-header-actions [role=status]{flex-basis:100%;max-width:none!important;text-align:right;color:var(--muted)}
+.studio-header-actions [role=status]:empty{display:none}
+@media(max-width:720px){
+ .studio-app .topbar{gap:10px 16px}
+ .studio-header-actions{flex:1 1 100%;justify-content:flex-start;margin-left:0;gap:8px 12px}
+ .studio-header-actions .nav-link{flex:1 1 100%;margin-right:0;min-height:32px;display:flex;align-items:center}
+ .studio-account-label{margin-right:auto;border-right:0;padding-right:0}
+ .studio-header-actions .control{min-height:44px}
+ .studio-header-actions [role=status]{text-align:left}
+}
+
+#slides-list{display:grid;gap:24px;margin:24px 0;align-items:start}
+#slides-list.slides-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+#slides-list.slides-rows{grid-template-columns:minmax(0,1fr)}
+.slide-review-card{min-width:0;padding:20px;border:1px solid #dce3f0;border-radius:16px;background:white;display:flex;flex-direction:column;gap:14px}
+.slide-review-card h3{margin:0;font-size:18px}
+.slide-review-card iframe{max-width:none;display:block;}
+.slide-review-card textarea{box-sizing:border-box;width:100%}
+@media(max-width:1000px){#slides-list.slides-grid{grid-template-columns:minmax(0,1fr)}}

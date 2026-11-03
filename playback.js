@@ -13,9 +13,10 @@ class PreparedPresenter extends Presenter{
 let annotationJob=null;
 let marking=false,anchor=null,previewBox=null,annotationFrame;
 const svgNS='http://www.w3.org/2000/svg';
-const presenter=new PreparedPresenter($('avatar'),message=>{$('status').textContent=message;});
+const presenter=new PreparedPresenter($('avatar'),message=>{$('status').classList.toggle('is-loading',/^(Loading|Preparing)/.test(message));$('status').textContent=message;});
 function halt(){epoch++;offset=presenter.position??offset;presenter.stop();playing=false;$('play').textContent='Play';drawAnnotations();}
 function render(){
+ $('notice').classList.toggle('is-loading',slidesLoading);
  const clip=draft.voice.clips[index],section=sections[clip.section-1]||'',slide=Number(section.match(/^Original slide:\s*(\d+)/m)?.[1]);
  const source=draft.sources.find(s=>s.id===draft.presentation.sourceId),page=renderedPages.find(a=>a.page===slide)||source?.import?.assets?.find(a=>a.kind==='page'&&a.page===slide);
  $('slide-image').hidden=!page;$('slide-text').hidden=!!page;
@@ -58,17 +59,17 @@ try{
  }
  if(source?.import?.originalUrl?.endsWith('.pptx')&&!source.import.assets?.some(a=>a.kind==='page')){
   slidesLoading=true;$('play').disabled=true;render();$('notice').textContent='Rendering your original PowerPoint slides. This happens once and is cached.';
-  fetch('/api/render-slides',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({originalUrl:source.import.originalUrl})}).then(async r=>{const data=await r.json();if(!r.ok)throw Error(data.error||'Slide rendering failed.');renderedPages=data.pages;slidesLoading=false;$('play').disabled=false;render();$('status').textContent='Original slides ready. Press Play.';}).catch(error=>{$('notice').textContent=error.message;$('status').textContent='Could not render the original slides. Reload to retry.';});
+  fetch('/api/render-slides',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({originalUrl:source.import.originalUrl})}).then(async r=>{const data=await r.json();if(!r.ok)throw Error(data.error||'Slide rendering failed.');renderedPages=data.pages;slidesLoading=false;$('play').disabled=false;render();$('status').textContent='Original slides ready. Press Play.';}).catch(error=>{$('notice').classList.remove('is-loading');$('notice').textContent=error.message;$('status').textContent='Could not render the original slides. Reload to retry.';});
  }
 
  $('play').onclick=()=>playing?halt():play();$('previous').onclick=()=>{halt();index=Math.max(0,index-1);offset=0;render();};$('next').onclick=()=>{halt();index=Math.min(draft.voice.clips.length-1,index+1);offset=0;render();};$('mute').onchange=()=>presenter.mute($('mute').checked);
  $('continue').onclick=()=>{$('checkpoint').hidden=true;if(index===draft.voice.clips.length-1){$('status').textContent='Rehearsal complete.';return;}index++;offset=0;render();play();};
  window.addEventListener('pagehide',()=>presenter.stop());
-}catch(error){$('status').textContent=error.message;for(const id of ['play','previous','next'])$(id).disabled=true;}
+}catch(error){$('notice').classList.remove('is-loading');$('status').classList.remove('is-loading');$('status').textContent=error.message;for(const id of ['play','previous','next'])$(id).disabled=true;}
 
 
 function currentAnnotationKey(){const clip=draft.voice.clips[index];return annotationKey(draft,clip,Number(sections[clip.section-1]?.match(/^Original slide:\s*(\d+)/m)?.[1]));}
-function marks(){return draft?.annotations?.[currentAnnotationKey()]||[];}
+function marks(){return draft?.annotationsSkipped?[]:draft?.annotations?.[currentAnnotationKey()]||[];}
 function bounds(){const image=$('slide-image'),stage=image.parentElement;return imageBounds(stage.clientWidth,stage.clientHeight,image.naturalWidth||16,image.naturalHeight||9);}
 function drawAnnotations(){
  const layer=$('annotation-layer');layer.replaceChildren();if(!draft||$('slide-image').hidden)return;
@@ -103,7 +104,7 @@ window.addEventListener('pagehide',()=>cancelAnimationFrame(annotationFrame));
 $('generate-ai-annotations').onclick=async()=>{
  if(annotationJob||!draft)return;
  if(slidesLoading){$('ai-annotation-status').textContent='Wait for the original slides to finish rendering.';return;}
- halt();const controller=new AbortController();annotationJob=controller;$('generate-ai-annotations').disabled=true;$('cancel-ai-annotations').hidden=false;$('play').disabled=true;
+ halt();$('ai-annotation-status').classList.add('is-loading');const controller=new AbortController();annotationJob=controller;$('generate-ai-annotations').disabled=true;$('cancel-ai-annotations').hidden=false;$('play').disabled=true;
  let completed=0;
  try{
   const source=draft.sources.find(s=>s.id===draft.presentation.sourceId);
@@ -118,6 +119,6 @@ $('generate-ai-annotations').onclick=async()=>{
   }
   $('ai-annotation-status').textContent='AI annotations ready for '+completed+' clips. Press Play to review them.';$('generate-ai-annotations').textContent='AI annotations generated';
  }catch(error){$('ai-annotation-status').textContent=error.name==='AbortError'?'Stopped. Completed clips are saved; click Generate to resume.':error.message;}
- finally{annotationJob=null;$('generate-ai-annotations').disabled=false;$('cancel-ai-annotations').hidden=true;$('play').disabled=slidesLoading;}
+ finally{$('ai-annotation-status').classList.remove('is-loading');annotationJob=null;$('generate-ai-annotations').disabled=false;$('cancel-ai-annotations').hidden=true;$('play').disabled=slidesLoading;}
 };
 $('cancel-ai-annotations').onclick=()=>annotationJob?.abort();

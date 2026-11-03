@@ -9,3 +9,17 @@ test('generated slide edits invalidate presenter instructions',async()=>{
  const d={presentation:{mode:'generated'},slides:{input:'approved-input',items:[{title:'First slide',bullets:['Point']}]}};
  const before=presentationFingerprint(d);assert.equal(before,directorFingerprint(d));d.slides.items[0].title='Changed title';assert.notEqual(before,directorFingerprint(d));
 });
+test('semantic slide formats include code tables charts and navigation',()=>{
+ const html=deckHTML([{title:'Code',bullets:[],code:'a < b',headers:['Input'],rows:[['7']],chartLabels:[],chartValues:[],number:3,total:8,breadcrumb:'Lecture / Topic'}],[]);assert.match(html,/<pre><code>a &lt; b/);assert.match(html,/<table>/);assert.match(html,/aria-label="Slide breadcrumb"/);assert.match(html,/<footer>/);assert.match(html,/3 \/ 8/);
+ const chart=deckHTML([{title:'Data',bullets:[],chartLabels:['A'],chartValues:[4],caption:'Given data'}],[]);assert.match(chart,/<svg/);assert.match(chart,/<figcaption>Given data/);
+});
+
+test('new decks require a dedicated objectives slide after the cover',async()=>{
+ const {validateObjectivesSlide}=await import('../slide-generation.mjs');
+ const cover={title:'Introduction',layout:'cover'};
+ const objectives={title:'Lecture objectives',layout:'content',bullets:['Identify inputs','Predict outputs']};
+ assert.doesNotThrow(()=>validateObjectivesSlide([cover,objectives]));
+ assert.throws(()=>validateObjectivesSlide([cover]));
+ assert.throws(()=>validateObjectivesSlide([objectives,cover]));
+ assert.throws(()=>validateObjectivesSlide([cover,{...objectives,bullets:[]}]));
+});

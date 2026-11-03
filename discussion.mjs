@@ -1,7 +1,8 @@
 export class Discussion {
  constructor({budgetSeconds=90,idleSeconds=12,reserveSeconds=20}={}){this.config={budgetSeconds,idleSeconds,reserveSeconds};this.reset();}
  reset(){this.messages=[];this.state='idle';this.remaining=0;this.idle=0;this.batch=[];this.coverage=[];this.history=[];this.sequence=0;this.handAcknowledged=false;this.typingRemaining=0;this.final=false;}
- add(text,kind='question'){const message={id:`m${++this.sequence}`,text,kind,status:'queued'};if(this.state==='closed'){message.status='deferred';message.reason='Checkpoint closed; saved for later';}this.messages.push(message);return message;}
+ add(text,kind='question'){const message={id:`m${++this.sequence}`,text,kind,status:kind==='discussion'?'conversation':'queued'};if(this.state==='closed'&&kind!=='discussion'){message.status='deferred';message.reason='Checkpoint closed; saved for later';}this.messages.push(message);return message;}
+ extend(seconds=30){if(!this.active||!Number.isFinite(seconds)||seconds<=0)return false;this.remaining+=seconds;if(this.state==='followup')this.idle+=seconds;return true;}
  get active(){return ['reviewing','speaking','followup'].includes(this.state);}
  get pending(){return this.messages.filter(m=>m.status==='queued');}
  raiseHand(){
@@ -20,7 +21,7 @@ export class Discussion {
   this.batch=[...this.pending];this.batch.forEach(m=>m.status='selected');this.state='reviewing';return this.batch;
  }
  accept(response){
-  if(this.state!=='reviewing')return false;
+  if(!['reviewing','speaking'].includes(this.state))return false;
   this.coverage=response.addressedIds;
   this.batch.filter(m=>response.deferredIds.includes(m.id)).forEach(m=>{m.status='deferred';m.reason='Outside this response’s scope';});
   this.state='speaking';return true;
@@ -28,15 +29,16 @@ export class Discussion {
  delivered(text){
   if(this.state!=='speaking')return;
   this.messages.filter(m=>this.coverage.includes(m.id)).forEach(m=>m.status='addressed');
-  this.history.push(text);this.handAcknowledged=false;this.state='followup';this.idle=this.final?30:this.config.idleSeconds;
+  this.history.push({questions:this.batch.map(m=>m.text),reply:text});this.handAcknowledged=false;this.state='followup';this.idle=this.final?30:this.config.idleSeconds;
   if(this.remaining<=0)this.close('Discussion time limit');
  }
  fail(reason){this.batch.filter(m=>m.status==='selected').forEach(m=>{m.status='deferred';m.reason=reason;});this.state='followup';this.idle=this.config.idleSeconds;}
  close(reason='Follow-up window ended'){
   this.messages.filter(m=>['queued','selected'].includes(m.status)).forEach(m=>{m.status='deferred';m.reason=reason;});this.state='closed';
  }
- tick(seconds){
+ tick(seconds,{buffering=false}={}){
   if(!this.active||!Number.isFinite(seconds)||seconds<=0)return;
+  if(this.state==='reviewing'||buffering)return;
   if(this.state==='followup'&&this.typingRemaining>0&&!this.pending.length){
    this.typingRemaining=Math.max(0,this.typingRemaining-seconds);
    if(this.typingRemaining===0)this.close('Student stopped typing without submitting');

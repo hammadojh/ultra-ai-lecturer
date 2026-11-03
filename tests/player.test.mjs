@@ -27,3 +27,23 @@ test('answer timeout resumes at answer with no spillover; reset clears timer',()
  p.tick(8);assert.equal(p.segment.id,'answer');assert.equal(p.offset,0);assert.equal(p.state,'playing');
  p.restart();assert.equal(p.answerRemaining,0);
 });
+
+test('custom activity timer extends without moving the narration and skip opens feedback',()=>{
+ const p=new LecturePlayer([{id:'task',slide:'one',duration:1,holdAfter:true,answerSeconds:75},{id:'next',slide:'two',duration:2}],{checkpoints:true});
+ assert.equal(p.extendActivity(),false);p.play();p.tick(1);p.tick(5);assert.equal(p.answerRemaining,70);
+ assert.equal(p.extendActivity(30),true);assert.equal(p.answerRemaining,100);assert.equal(p.index,0);
+ assert.equal(p.extendActivity(-1),false);p.completeAnswers();assert.equal(p.state,'discussion');p.continue();assert.equal(p.segment.id,'next');
+});
+
+test('facilitator interruption resumes the exact narration position and prior state',()=>{
+ for(const state of ['playing','paused','ready','completed']){
+  const p=new LecturePlayer(lecture.segments,{checkpoints:true});p.state=state;p.offset=2.25;
+  assert.equal(p.interruptForDiscussion(),true);assert.equal(p.state,'discussion');assert.equal(p.interruptForDiscussion(),false);
+  p.tick(20);p.continue();assert.equal(p.state,state);assert.equal(p.offset,2.25);assert.equal(p.index,0);assert.equal(p.interruption,null);
+ }
+});
+test('facilitator question freezes activity time and restart discards the resume point',()=>{
+ const p=new LecturePlayer(lecture.segments,{checkpoints:true});p.play();p.tick(100);p.tick(7);const remaining=p.answerRemaining;
+ p.interruptForDiscussion();p.tick(99);p.continue();assert.equal(p.state,'activity');assert.equal(p.answerRemaining,remaining);
+ p.interruptForDiscussion();p.restart();assert.equal(p.interruption,null);assert.equal(p.state,'ready');
+});

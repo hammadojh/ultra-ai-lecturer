@@ -8,22 +8,33 @@ export class LecturePlayer {
     this.offset = 0;
     this.state = 'ready';
     this.answerRemaining = 0;
+    this.interruption = null;
   }
   get segment() { return this.segments[this.index]; }
   get duration() { return this.segments.reduce((sum,s) => sum+s.duration,0); }
   get elapsed() { return this.segments.slice(0,this.index).reduce((sum,s) => sum+s.duration,0)+this.offset; }
   play() { if (this.state === 'ready' || this.state === 'paused') this.state = 'playing'; }
   pause() { if (this.state === 'playing') this.state = 'paused'; }
-  restart() { this.index=0; this.offset=0; this.state='ready'; this.answerRemaining=0; }
+  restart() { this.interruption=null; this.index=0; this.offset=0; this.state='ready'; this.answerRemaining=0; }
   seekSlide(slide) {
     const index=this.segments.findIndex(s => s.slide===slide);
     if(index<0) return;
-    this.index=index; this.offset=0; this.state='paused'; this.answerRemaining=0;
+    this.interruption=null; this.index=index; this.offset=0; this.state='paused'; this.answerRemaining=0;
+  }
+  interruptForDiscussion() {
+    if(this.state==='discussion'||this.interruption)return false;
+    this.interruption={index:this.index,offset:this.offset,state:this.state,answerRemaining:this.answerRemaining};
+    this.state='discussion';return true;
   }
   continue() {
     if(!['activity','discussion'].includes(this.state)) return;
+    if(this.interruption){const saved=this.interruption;this.interruption=null;Object.assign(this,saved);return;}
     if(this.index===this.segments.length-1){this.state='completed';return;}
     this.index++; this.offset=0; this.answerRemaining=0; this.state='playing';
+  }
+  extendActivity(seconds=30) {
+    if(this.state!=='activity'||!Number.isFinite(seconds)||seconds<=0)return false;
+    this.answerRemaining+=seconds;return true;
   }
   completeAnswers() {
     if(this.state!=='activity') return;
